@@ -5,7 +5,7 @@ import Show, { IShowSeat } from "@/models/Show";
 import Screen from "@/models/Screen";
 import Movie from "@/models/Movie";
 import Cinema from "@/models/Cinema";
-import { ensureDefaultCinemas, generateDefaultSeats } from "@/app/api/cinemas/route";
+import { ensureDefaultCinemas, generateDefaultSeats } from "@/lib/cinemas";
 
 export async function GET(request: NextRequest) {
   try {
