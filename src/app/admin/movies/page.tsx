@@ -14,6 +14,9 @@ import {
   AlertCircle,
   RefreshCw,
   Clapperboard,
+  Trash2,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 
 interface MovieItem {
@@ -42,6 +45,7 @@ export default function AdminMoviesPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchMovies = useCallback(async () => {
     setIsLoading(true);
@@ -74,6 +78,31 @@ export default function AdminMoviesPage() {
     return () => clearTimeout(timer);
   }, [fetchMovies]);
 
+  const handleDeleteMovie = async (id: string, title: string) => {
+    if (!confirm(`Are you sure you want to delete "${title}"? This will also remove any scheduled showtimes.`)) {
+      return;
+    }
+
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/movies/${id}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to delete movie");
+      }
+
+      setMovies((prev) => prev.filter((m) => m._id !== id));
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Error deleting movie");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const getStatusBadge = (status: MovieItem["status"]) => {
     switch (status) {
       case "now_showing":
@@ -101,216 +130,158 @@ export default function AdminMoviesPage() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-16 font-sans">
-      {/* Page Header */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-[#0f172a] tracking-tight">
-            Movies
+          <h1 className="text-2xl font-black text-[#0f172a] tracking-tight">
+            Movies Directory
           </h1>
           <p className="text-xs text-[#64748b] mt-1">
-            Manage movie listings, release statuses, and cinema screening details.
+            Manage movie listings, release status, synopses, and box office metadata.
           </p>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={fetchMovies}
-            title="Refresh"
-            className="p-2 text-slate-500 hover:text-slate-900 bg-white hover:bg-slate-50 border border-[#e2e8f0] rounded-lg transition-colors cursor-pointer shadow-2xs"
-          >
-            <RefreshCw size={15} className={isLoading ? "animate-spin" : ""} />
-          </button>
-          <Link
-            href="/admin/movies/new"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#ff5500] hover:bg-[#e64d00] text-white font-semibold text-xs rounded-lg transition-colors shadow-sm cursor-pointer"
-          >
-            <Plus size={15} />
-            <span>Add New Movie</span>
-          </Link>
-        </div>
+        <Link
+          href="/admin/movies/new"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#ff5500] hover:bg-[#e64d00] text-white font-semibold text-xs rounded-lg transition-colors shadow-sm cursor-pointer w-fit"
+        >
+          <Plus size={15} />
+          <span>Add New Movie</span>
+        </Link>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-[#e8ecf2] p-3 rounded-xl shadow-2xs">
+      {/* Filters Bar */}
+      <div className="bg-white border border-[#e8ecf2] rounded-xl p-4 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
+        {/* Search Input */}
+        <div className="relative w-full sm:w-80">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+          <input
+            type="text"
+            placeholder="Search by title, genre, director..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-8 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-[#ff5500]"
+          />
+        </div>
+
         {/* Status Filter Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-          {[
-            { id: "all", label: "All Movies" },
-            { id: "now_showing", label: "Now Showing" },
-            { id: "coming_soon", label: "Coming Soon" },
-            { id: "ended", label: "Ended" },
-          ].map((tab) => (
+        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg text-xs w-full sm:w-auto">
+          {["all", "now_showing", "coming_soon", "ended"].map((tab) => (
             <button
-              key={tab.id}
-              type="button"
-              onClick={() => setStatusFilter(tab.id)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
-                statusFilter === tab.id
-                  ? "bg-[#0f172a] text-white shadow-2xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+              key={tab}
+              onClick={() => setStatusFilter(tab)}
+              className={`px-3 py-1.5 rounded-md font-semibold text-[11px] capitalize transition-all cursor-pointer ${
+                statusFilter === tab
+                  ? "bg-white text-slate-900 shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              {tab.label}
+              {tab.replace("_", " ")}
             </button>
           ))}
         </div>
-
-        {/* Search Input */}
-        <div className="relative w-full sm:w-64">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-          />
-          <input
-            type="text"
-            placeholder="Search title, genre, director..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#ff5500] transition-all"
-          />
-        </div>
       </div>
 
-      {/* Error state */}
+      {/* Error Banner */}
       {error && (
-        <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-center gap-2">
-          <AlertCircle size={15} className="shrink-0" />
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2">
+          <AlertCircle size={16} />
           <span>{error}</span>
         </div>
       )}
 
-      {/* Loading state */}
+      {/* Movies Table / Cards */}
       {isLoading ? (
-        <div className="rounded-xl border border-[#e8ecf2] bg-white p-14 text-center shadow-2xs">
-          <Loader2 size={28} className="animate-spin text-[#ff5500] mx-auto mb-2.5" />
-          <p className="text-xs text-slate-500 font-mono">Loading movie catalog...</p>
+        <div className="bg-white border border-[#e8ecf2] rounded-xl p-12 text-center shadow-2xs">
+          <Loader2 size={28} className="animate-spin text-[#ff5500] mx-auto mb-2" />
+          <p className="text-xs text-slate-400 font-mono">Loading movie listings...</p>
         </div>
       ) : movies.length === 0 ? (
-        /* Empty State */
-        <div className="rounded-xl border border-[#e8ecf2] bg-white p-12 text-center shadow-2xs">
-          <div className="mx-auto w-12 h-12 rounded-xl bg-[#fff4ed] text-[#ff5500] flex items-center justify-center mb-3.5">
-            <Clapperboard size={24} />
-          </div>
-          <h3 className="text-base font-bold text-[#0f172a]">No Movies Found</h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed">
-            {searchQuery || statusFilter !== "all"
-              ? "No titles matched your search filters. Try clearing your search query."
-              : "Get started by adding your first movie entry to the catalog."}
+        <div className="bg-white border border-[#e8ecf2] rounded-xl p-12 text-center shadow-2xs space-y-3">
+          <Clapperboard size={32} className="mx-auto text-slate-400" />
+          <h3 className="text-base font-bold text-slate-800">No movies found</h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            No movie records match your current filters. Add a new movie or clear your search query.
           </p>
-          <div className="mt-5">
-            <Link
-              href="/admin/movies/new"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#ff5500] hover:bg-[#e64d00] text-white font-semibold text-xs rounded-lg transition-colors shadow-sm cursor-pointer"
-            >
-              <Plus size={14} />
-              <span>Add New Movie</span>
-            </Link>
-          </div>
         </div>
       ) : (
-        /* Movies Grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {movies.map((movie) => (
-            <div
-              key={movie._id}
-              className="group bg-white border border-[#e8ecf2] hover:border-slate-300 rounded-xl overflow-hidden transition-all shadow-2xs flex flex-col justify-between"
-            >
-              <div>
-                {/* Poster and Badges */}
-                <div className="relative aspect-16/10 w-full overflow-hidden bg-slate-900">
-                  {movie.thumbnail?.url ? (
-                    <Image
-                      src={movie.thumbnail.url}
-                      alt={movie.title}
-                      fill
-                      className="object-cover group-hover:scale-103 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-500">
-                      <Clapperboard size={32} />
-                    </div>
-                  )}
-
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
-
-                  {/* Status badge */}
-                  <div className="absolute top-3 left-3">
-                    {getStatusBadge(movie.status)}
-                  </div>
-
-                  {/* Rating badge */}
-                  {typeof movie.rating === "number" && (
-                    <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-xs text-amber-400 text-xs font-bold border border-amber-400/20">
-                      <Star size={11} className="fill-amber-400" />
-                      <span>{movie.rating.toFixed(1)}</span>
-                    </div>
-                  )}
-
-                  {/* Title overlay */}
-                  <div className="absolute bottom-3 left-3 right-3">
-                    <h3 className="text-base font-bold text-white truncate drop-shadow-xs">
-                      {movie.title}
-                    </h3>
-                    <p className="text-[11px] text-slate-300 font-mono truncate">
-                      /{movie.slug}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Details Body */}
-                <div className="p-4 space-y-3">
-                  <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
-                    {movie.shortDescription}
-                  </p>
-
-                  {/* Metadata */}
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 font-mono">
-                    <span className="flex items-center gap-1">
-                      <Clock size={12} />
-                      <span>{movie.duration} min</span>
-                    </span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <Calendar size={12} />
-                      <span>{new Date(movie.releaseDate).toLocaleDateString()}</span>
-                    </span>
-                    <span>•</span>
-                    <span className="uppercase">{movie.language}</span>
-                  </div>
-
-                  {/* Genre tags */}
-                  <div className="flex flex-wrap gap-1.5 pt-0.5">
-                    {movie.genre?.slice(0, 3).map((g) => (
-                      <span
-                        key={g}
-                        className="px-2.5 py-0.5 rounded-md bg-[#f1f5f9] text-[11px] text-slate-700 font-medium"
-                      >
-                        {g}
+        <div className="bg-white border border-[#e8ecf2] rounded-xl shadow-2xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 font-medium uppercase tracking-wider text-[10px]">
+                  <th className="py-3 px-4">Movie</th>
+                  <th className="py-3 px-4">Genre & Lang</th>
+                  <th className="py-3 px-4">Duration</th>
+                  <th className="py-3 px-4">Rating</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {movies.map((m) => (
+                  <tr key={m._id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-3">
+                        <div className="relative w-10 h-14 rounded-md overflow-hidden bg-slate-900 shrink-0 border border-slate-200">
+                          <Image
+                            src={m.thumbnail?.url || "/images/hero-banner.jpg"}
+                            alt={m.title}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 text-sm">{m.title}</p>
+                          <p className="text-[11px] text-slate-400">{m.slug}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <p className="font-semibold text-slate-800">{m.genre?.slice(0, 2).join(", ")}</p>
+                      <p className="text-[11px] text-slate-400">{m.language}</p>
+                    </td>
+                    <td className="py-3 px-4 font-mono font-medium text-slate-700">
+                      {m.duration} mins
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="inline-flex items-center gap-1 font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                        <Star size={11} className="fill-amber-500 text-amber-500" />
+                        <span>{m.rating ? m.rating.toFixed(1) : "8.5"}</span>
                       </span>
-                    ))}
-                    {movie.genre?.length > 3 && (
-                      <span className="px-2 py-0.5 rounded-md bg-slate-50 text-[11px] text-slate-500 border border-slate-200">
-                        +{movie.genre.length - 3}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Card Footer */}
-              <div className="p-3 bg-[#fbfcfd] border-t border-[#f1f5f9] flex items-center justify-between text-xs">
-                <span className="text-[11px] text-slate-500 truncate max-w-[170px]">
-                  {movie.director ? `Dir: ${movie.director}` : "Movexa Cinema"}
-                </span>
-                <span className="text-[#ff5500] hover:text-[#d94800] font-semibold text-xs flex items-center gap-1">
-                  <span>View Details</span>
-                  <ExternalLink size={12} />
-                </span>
-              </div>
-            </div>
-          ))}
+                    </td>
+                    <td className="py-3 px-4">
+                      {getStatusBadge(m.status)}
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Link
+                          href={`/movies/${m.slug}`}
+                          target="_blank"
+                          className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors"
+                          title="Preview public page"
+                        >
+                          <ExternalLink size={13} />
+                        </Link>
+                        <button
+                          onClick={() => handleDeleteMovie(m._id, m.title)}
+                          disabled={deletingId === m._id}
+                          className="p-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-600 transition-colors cursor-pointer disabled:opacity-50"
+                          title="Delete movie"
+                        >
+                          {deletingId === m._id ? (
+                            <Loader2 size={13} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={13} />
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

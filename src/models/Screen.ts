@@ -15,46 +15,51 @@ export interface IScreen extends Document {
   updatedAt: Date;
 }
 
-
-const seatSchema = new Schema<ISeat>({
+const seatSchema = new Schema<ISeat>(
+  {
     row: {
       type: String,
       required: true,
     },
     number: {
-        type: Number,
-        required: true,
+      type: Number,
+      required: true,
     },
     type: {
-        type: String,
-        enum: ["regular", "premium"],
-        default: "regular",
+      type: String,
+      enum: ["regular", "premium"],
+      default: "regular",
     },
-}, { _id: false });
+  },
+  { _id: false }
+);
 
-
-const screenSchema = new Schema<IScreen>({
+const screenSchema = new Schema<IScreen>(
+  {
     cinema: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Cinema",
-        required: true,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Cinema",
+      required: true,
     },
     name: {
-        type: String,
-        required: true,
+      type: String,
+      required: true,
     },
     seats: {
-        type: [seatSchema],
-        required: true,
+      type: [seatSchema],
+      required: true,
     },
     isActive: {
-        type: Boolean,
-        default: true,
+      type: Boolean,
+      default: true,
     },
-}, { timestamps: true });
+  },
+  { timestamps: true }
+);
 
 screenSchema.index({ cinema: 1, name: 1 }, { unique: true });
 
-const Screen: Model<IScreen> = mongoose.model<IScreen>("Screen", screenSchema);
+const Screen: Model<IScreen> =
+  mongoose.models.Screen || mongoose.model<IScreen>("Screen", screenSchema);
 
 export default Screen;

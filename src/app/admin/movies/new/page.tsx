@@ -531,6 +531,35 @@ export default function NewMoviePage() {
               </div>
             )}
 
+            {/* Quick Poster Presets or Direct URL */}
+            <div className="pt-2 space-y-2 border-t border-slate-100">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                Or pick a preset poster:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { name: "Dune", url: "/images/dune-hero.jpg" },
+                  { name: "Oppenheimer", url: "/images/cinema-auth.jpg" },
+                  { name: "Noir City", url: "/images/poster-noir.jpg" },
+                  { name: "Sci-Fi Rift", url: "/images/hero-banner.jpg" },
+                ].map((preset) => (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    onClick={() =>
+                      setThumbnail({
+                        url: preset.url,
+                        publicId: `preset-${preset.name.toLowerCase()}`,
+                      })
+                    }
+                    className="px-2 py-1 text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md transition-colors cursor-pointer"
+                  >
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {imageUploadError && (
               <p className="text-xs text-rose-600 mt-1 flex items-center gap-1">
                 <AlertCircle size={12} />

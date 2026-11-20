@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2, AlertCircle } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2, AlertCircle, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
@@ -49,7 +49,7 @@ export default function LoginPage() {
         return;
       }
 
-      // Check role and redirect securely
+      // Check role and redirect
       if (result.user?.role === "admin") {
         router.push("/admin");
       } else {
@@ -62,6 +62,12 @@ export default function LoginPage() {
       );
       setIsSubmitting(false);
     }
+  };
+
+  const handleFillAdmin = () => {
+    setEmail("admin@gamil.com");
+    setPassword("admin123");
+    setErrorMessage(null);
   };
 
   return (
@@ -96,7 +102,7 @@ export default function LoginPage() {
               More Movies. More Moments.
             </h2>
             <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed max-w-sm font-light">
-              Your favorite movies, just a click away. Book tickets, explore cinemas, and enjoy the big screen experience.
+              Your favorite movies, just a click away. Book tickets, explore cinemas, and enjoy the ultimate big screen experience.
             </p>
           </div>
         </div>
@@ -113,14 +119,31 @@ export default function LoginPage() {
             </div>
 
             {/* Header Titles */}
-            <div className="mb-7">
+            <div className="mb-6">
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-900 font-sans flex items-center gap-2">
                 <span>Welcome Back</span>
                 <span className="inline-block">👋</span>
               </h1>
               <p className="text-xs sm:text-sm text-neutral-500 mt-1">
-                Login to your Movexa account
+                Login to your Movexa account to reserve tickets
               </p>
+            </div>
+
+            {/* Admin Quick Mock Banner */}
+            <div className="mb-6 p-3 bg-amber-50/80 border border-amber-200/80 rounded-xl flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 text-amber-900 font-medium">
+                <ShieldCheck size={18} className="text-amber-600 shrink-0" />
+                <span>
+                  Admin Demo: <strong className="font-mono">admin@gamil.com</strong> / <strong className="font-mono">admin123</strong>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleFillAdmin}
+                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-md text-[11px] transition-colors shrink-0 cursor-pointer shadow-xs"
+              >
+                Auto Fill
+              </button>
             </div>
 
             {/* Error Message Alert */}
@@ -197,7 +220,7 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Remember me & Forgot password */}
+              {/* Remember me option */}
               <div className="flex items-center justify-between text-xs pt-1">
                 <label className="flex items-center gap-2 cursor-pointer select-none text-neutral-700 font-medium">
                   <input
@@ -206,18 +229,8 @@ export default function LoginPage() {
                     onChange={(e) => setRememberMe(e.target.checked)}
                     className="w-4 h-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 accent-neutral-900 cursor-pointer"
                   />
-                  <span>Remember me</span>
+                  <span>Keep me signed in</span>
                 </label>
-                <a
-                  href="#forgot"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    alert("Password reset will be available soon.");
-                  }}
-                  className="text-neutral-700 hover:text-black font-medium transition-colors"
-                >
-                  Forgot password?
-                </a>
               </div>
 
               {/* Submit Button */}
@@ -233,49 +246,12 @@ export default function LoginPage() {
                   </>
                 ) : (
                   <>
-                    <span>Login</span>
+                    <span>Sign In</span>
                     <ArrowRight size={15} />
                   </>
                 )}
               </button>
             </form>
-
-            {/* Divider */}
-            <div className="my-6 relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-neutral-200" />
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="bg-white px-3 text-neutral-400">or</span>
-              </div>
-            </div>
-
-            {/* Social Button (Google) */}
-            <button
-              type="button"
-              onClick={() => alert("Google OAuth integration coming soon.")}
-              className="w-full py-2.5 px-4 border border-neutral-300 hover:border-neutral-400 hover:bg-neutral-50 rounded-lg text-xs sm:text-sm font-medium text-neutral-700 flex items-center justify-center gap-2.5 transition-all cursor-pointer"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                />
-              </svg>
-              <span>Continue with Google</span>
-            </button>
           </div>
 
           {/* Switch to Register */}
@@ -286,7 +262,7 @@ export default function LoginPage() {
                 href="/register"
                 className="font-bold text-neutral-900 hover:underline underline-offset-4"
               >
-                Register
+                Register here
               </Link>
             </p>
           </div>
