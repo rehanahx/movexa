@@ -184,7 +184,7 @@ For testing and evaluation during project examination:
 The `.env` file in the project root is already preconfigured with MongoDB Atlas and JWT Secret:
 
 ```env
-MONGODB_URI=mongodb+srv://Rehan:rehan123@first.wva2a4y.mongodb.net/movexa?retryWrites=true&w=majority
+MONGODB_URI=
 JWT_SECRET=zRTwkgoghJXvXA1ENEqCDlTlM6biD9GaH3nE4ACVlQ4
 NODE_ENV="dev"
 ```
