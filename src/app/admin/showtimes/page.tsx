@@ -63,6 +63,21 @@ export default function AdminShowtimesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
 
+  const openModal = () => {
+    if (cinemas.length > 0) {
+      const defaultCinema = cinemas[0];
+      setSelectedCinemaId((prev) => prev || defaultCinema._id);
+      if (defaultCinema.screens && defaultCinema.screens.length > 0) {
+        setSelectedScreenId((prev) => prev || defaultCinema.screens[0]._id);
+      }
+    }
+    if (movies.length > 0 && !selectedMovieId) {
+      setSelectedMovieId(movies[0]._id);
+    }
+    setModalError(null);
+    setIsModalOpen(true);
+  };
+
   // Form Fields
   const [selectedMovieId, setSelectedMovieId] = useState("");
   const [selectedCinemaId, setSelectedCinemaId] = useState("");
@@ -205,7 +220,7 @@ export default function AdminShowtimesPage() {
         </div>
 
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={openModal}
           className="inline-flex items-center gap-2 px-4 py-2 bg-[#ff5500] hover:bg-[#e64d00] text-white font-semibold text-xs rounded-lg transition-colors shadow-sm cursor-pointer w-fit"
         >
           <Plus size={15} />

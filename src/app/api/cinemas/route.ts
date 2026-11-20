@@ -3,11 +3,15 @@ import { connectDB } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import Cinema from "@/models/Cinema";
 import Screen from "@/models/Screen";
+import { ensureDefaultCinemas, generateDefaultSeats } from "@/lib/cinemas";
 
 export async function GET() {
   try {
     await connectDB();
-    const cinemas = await Cinema.find({ isActive: true }).sort({ createdAt: -1 }).lean();
+    // Ensure default 1-2 cinemas and screens are always ready
+    await ensureDefaultCinemas();
+
+    const cinemas = await Cinema.find({ isActive: true }).sort({ createdAt: 1 }).lean();
 
     // Fetch screens for each cinema
     const cinemasWithScreens = await Promise.all(
@@ -57,9 +61,20 @@ export async function POST(request: NextRequest) {
       isActive: true,
     });
 
+    // Automatically create a default Auditorium Screen for newly created cinema
+    const defaultScreen = await Screen.create({
+      cinema: cinema._id,
+      name: "Auditorium 1 - Main Screen",
+      seats: generateDefaultSeats(),
+      isActive: true,
+    });
+
     return NextResponse.json({
       success: true,
-      cinema,
+      cinema: {
+        ...cinema.toObject(),
+        screens: [defaultScreen],
+      },
     }, { status: 201 });
   } catch (error) {
     console.error("CREATE_CINEMA_ERROR:", error);

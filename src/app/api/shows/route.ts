@@ -5,6 +5,7 @@ import Show, { IShowSeat } from "@/models/Show";
 import Screen from "@/models/Screen";
 import Movie from "@/models/Movie";
 import Cinema from "@/models/Cinema";
+import { ensureDefaultCinemas, generateDefaultSeats } from "@/app/api/cinemas/route";
 
 export async function GET(request: NextRequest) {
   try {
@@ -52,16 +53,48 @@ export async function POST(request: NextRequest) {
     if (authError) return authError;
 
     const body = await request.json();
-    const { movieId, cinemaId, screenId, date, startTime, endTime, regularPrice = 250, premiumPrice = 450 } = body;
-
-    if (!movieId || !cinemaId || !screenId || !date || !startTime || !endTime) {
-      return NextResponse.json(
-        { success: false, message: "All show parameters are required" },
-        { status: 400 }
-      );
-    }
+    let {
+      movieId,
+      cinemaId,
+      screenId,
+      date = new Date().toISOString().split("T")[0],
+      startTime = "06:30 PM",
+      endTime = "09:15 PM",
+      regularPrice = 250,
+      premiumPrice = 450,
+    } = body;
 
     await connectDB();
+
+    // Ensure default cinemas and screens exist
+    const defaults = await ensureDefaultCinemas();
+
+    // If cinemaId not provided, default to Cinema 1
+    if (!cinemaId) {
+      cinemaId = defaults.cinema1._id.toString();
+    }
+
+    // If screenId not provided, default to Cinema 1's screen
+    if (!screenId) {
+      const foundScreen = await Screen.findOne({ cinema: cinemaId });
+      if (foundScreen) {
+        screenId = foundScreen._id.toString();
+      } else {
+        screenId = defaults.screen1._id.toString();
+      }
+    }
+
+    // If movieId not provided, pick the first movie
+    if (!movieId) {
+      const firstMovie = await Movie.findOne();
+      if (!firstMovie) {
+        return NextResponse.json(
+          { success: false, message: "No movie found. Please add a movie first." },
+          { status: 400 }
+        );
+      }
+      movieId = firstMovie._id.toString();
+    }
 
     // Fetch the screen to construct show seats
     const screen = await Screen.findById(screenId);
@@ -76,20 +109,14 @@ export async function POST(request: NextRequest) {
         status: "available",
       } as IShowSeat));
     } else {
-      // Default 70-seat layout
-      const rows = ["A", "B", "C", "D", "E", "F", "G"];
-      rows.forEach((row, rIdx) => {
-        const isPremium = rIdx >= 5;
-        for (let num = 1; num <= 10; num++) {
-          seats.push({
-            row,
-            number: num,
-            type: isPremium ? "premium" : "regular",
-            price: isPremium ? Number(premiumPrice) : Number(regularPrice),
-            status: "available",
-          } as IShowSeat);
-        }
-      });
+      const defaultSeats = generateDefaultSeats();
+      seats = defaultSeats.map((s) => ({
+        row: s.row,
+        number: s.number,
+        type: s.type,
+        price: s.type === "premium" ? Number(premiumPrice) : Number(regularPrice),
+        status: "available",
+      } as IShowSeat));
     }
 
     const showDate = new Date(date);
@@ -112,7 +139,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Showtime scheduled successfully",
+      message: "Showtime scheduled successfully with default auditorium!",
       show: populatedShow,
     }, { status: 201 });
   } catch (error) {
