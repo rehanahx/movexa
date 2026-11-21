@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -13,6 +13,8 @@ import {
   Sparkles,
   Play,
   ChevronLeft,
+  CheckCircle2,
+  Tv,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -34,7 +36,8 @@ interface MovieItem {
   status: "now_showing" | "coming_soon" | "ended";
 }
 
-interface HeroSlide {
+interface DynamicHeroSlide {
+  id: string;
   title: string;
   slug: string;
   tag: string;
@@ -43,55 +46,114 @@ interface HeroSlide {
   rating: string;
   duration: string;
   genre: string;
+  isFeatured: boolean;
+  trailerUrl?: string;
 }
-
-const STATIC_HERO_SLIDES: HeroSlide[] = [
-  {
-    title: "Dune: Part Two",
-    slug: "dune-part-two",
-    tag: "NOW SHOWING IN IMAX 70MM",
-    synopsis:
-      "Paul Atreides unites with Chani and the Fremen while seeking revenge against the conspirators who destroyed his family.",
-    image: "/images/dune-hero.jpg",
-    rating: "8.8",
-    duration: "2h 46m",
-    genre: "Action • Adventure • Sci-Fi",
-  },
-  {
-    title: "Oppenheimer",
-    slug: "oppenheimer",
-    tag: "SPECIAL 4K LASER SCREENING",
-    synopsis:
-      "The historical story of J. Robert Oppenheimer and his role in the Manhattan Project.",
-    image: "/images/cinema-auth.jpg",
-    rating: "8.9",
-    duration: "3h 00m",
-    genre: "Drama • Biography • History",
-  },
-  {
-    title: "Silent Frequency",
-    slug: "silent-frequency",
-    tag: "PREMIERE SELECTION",
-    synopsis:
-      "An audio forensics investigator in a rain-soaked metropolis uncovers a secret broadcast hidden within city ambient frequencies.",
-    image: "/images/poster-noir.jpg",
-    rating: "9.1",
-    duration: "2h 16m",
-    genre: "Neo-Noir • Thriller",
-  },
-];
 
 export default function HomePage() {
   const { user } = useAuth();
   const [movies, setMovies] = useState<MovieItem[]>([]);
-  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>(STATIC_HERO_SLIDES);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeHeroSlide, setActiveHeroSlide] = useState(0);
   const [heroTransitioning, setHeroTransitioning] = useState(false);
 
-  // Go to slide with fade transition
+  // Fetch movies from API
+  useEffect(() => {
+    let isMounted = true;
+    async function loadData() {
+      setIsLoading(true);
+      try {
+        const res = await fetch("/api/movies");
+        const data = await res.json();
+        if (data.success && data.movies && data.movies.length > 0) {
+          if (isMounted) setMovies(data.movies);
+        } else {
+          // If empty, auto-trigger seed
+          const seedRes = await fetch("/api/seed");
+          const seedData = await seedRes.json();
+          if (seedData.success) {
+            const secondRes = await fetch("/api/movies");
+            const secondData = await secondRes.json();
+            if (isMounted && secondData.success) {
+              setMovies(secondData.movies || []);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error loading movies:", err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+    loadData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Compute 100% dynamic hero slides from MongoDB movies
+  const dynamicHeroSlides = useMemo<DynamicHeroSlide[]>(() => {
+    if (!movies || movies.length === 0) {
+      // Temporary fallback while loading
+      return [
+        {
+          id: "seed-dune",
+          title: "Dune: Part Two",
+          slug: "dune-part-two",
+          tag: "NOW SHOWING IN IMAX 70MM",
+          synopsis:
+            "Paul Atreides unites with Chani and the Fremen while seeking revenge against conspirators.",
+          image: "/images/dune-hero.jpg",
+          rating: "8.8",
+          duration: "2h 46m",
+          genre: "Action • Adventure • Sci-Fi",
+          isFeatured: true,
+        },
+      ];
+    }
+
+    // 1. Featured movies first
+    const featured = movies.filter((m) => m.isFeatured);
+    // 2. Additional now_showing movies
+    const nonFeatured = movies.filter((m) => !m.isFeatured && m.status === "now_showing");
+    // 3. Fallback to any remaining
+    const remaining = movies.filter((m) => !m.isFeatured && m.status !== "now_showing");
+
+    const orderedPool = [...featured, ...nonFeatured, ...remaining].slice(0, 5);
+
+    return orderedPool.map((m) => {
+      const banner = m.bannerImage?.url || m.thumbnail?.url || "/images/hero-banner.jpg";
+      const tag =
+        m.tagline ||
+        (m.isFeatured
+          ? "PREMIERE FEATURED"
+          : m.status === "now_showing"
+          ? "NOW PLAYING IN CINEMAS"
+          : "COMING SOON");
+      const durationStr =
+        m.duration >= 60
+          ? `${Math.floor(m.duration / 60)}h ${m.duration % 60}m`
+          : `${m.duration}m`;
+
+      return {
+        id: m._id,
+        title: m.title,
+        slug: m.slug,
+        tag,
+        synopsis: m.shortDescription,
+        image: banner,
+        rating: m.rating ? m.rating.toFixed(1) : "8.5",
+        duration: durationStr,
+        genre: m.genre?.slice(0, 3).join(" • ") || "Cinema",
+        isFeatured: !!m.isFeatured,
+        trailerUrl: m.trailerUrl,
+      };
+    });
+  }, [movies]);
+
+  // Go to slide with smooth fade
   const goToSlide = useCallback(
     (idx: number) => {
       if (idx === activeHeroSlide || heroTransitioning) return;
@@ -99,74 +161,25 @@ export default function HomePage() {
       setTimeout(() => {
         setActiveHeroSlide(idx);
         setHeroTransitioning(false);
-      }, 300);
+      }, 250);
     },
     [activeHeroSlide, heroTransitioning]
   );
 
-  // Auto-rotate hero
+  // Auto-rotate hero every 6.5s
   useEffect(() => {
+    if (dynamicHeroSlides.length <= 1) return;
     const timer = setInterval(() => {
       setHeroTransitioning(true);
       setTimeout(() => {
-        setActiveHeroSlide((prev) => (prev + 1) % heroSlides.length);
+        setActiveHeroSlide((prev) => (prev + 1) % dynamicHeroSlides.length);
         setHeroTransitioning(false);
-      }, 300);
-    }, 6000);
+      }, 250);
+    }, 6500);
     return () => clearInterval(timer);
-  }, [heroSlides.length]);
+  }, [dynamicHeroSlides.length]);
 
-  // Fetch movies + build dynamic hero from featured
-  useEffect(() => {
-    async function loadData() {
-      setIsLoading(true);
-      try {
-        // Load all movies
-        const res = await fetch("/api/movies");
-        const data = await res.json();
-        let allMovies: MovieItem[] = [];
-
-        if (data.success && data.movies?.length > 0) {
-          allMovies = data.movies;
-        } else {
-          // Auto-seed on empty DB
-          const seedRes = await fetch("/api/seed");
-          const seedData = await seedRes.json();
-          if (seedData.success) {
-            const r2 = await fetch("/api/movies");
-            const d2 = await r2.json();
-            allMovies = d2.movies || [];
-          }
-        }
-
-        setMovies(allMovies);
-
-        // Build hero from featured movies
-        const featured = allMovies.filter((m) => m.isFeatured);
-        if (featured.length > 0) {
-          const dynamicSlides: HeroSlide[] = featured.map((m) => ({
-            title: m.title,
-            slug: m.slug,
-            tag: m.tagline || "NOW SHOWING",
-            synopsis: m.shortDescription,
-            image: m.bannerImage?.url || m.thumbnail.url,
-            rating: m.rating?.toFixed(1) || "8.5",
-            duration: `${Math.floor(m.duration / 60)}h ${m.duration % 60}m`,
-            genre: m.genre.slice(0, 3).join(" • "),
-          }));
-          setHeroSlides(dynamicSlides);
-          setActiveHeroSlide(0);
-        }
-      } catch (err) {
-        console.error("Error loading movies:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadData();
-  }, []);
-
-  // Filter movies
+  // Filter movies catalog
   const filteredMovies = movies.filter((movie) => {
     const matchesStatus =
       statusFilter === "all" ? true : movie.status === statusFilter;
@@ -179,138 +192,174 @@ export default function HomePage() {
     return matchesStatus && matchesQuery;
   });
 
-  const heroSlide = heroSlides[activeHeroSlide] || heroSlides[0];
+  const currentSlide = dynamicHeroSlides[activeHeroSlide] || dynamicHeroSlides[0];
 
   return (
-    <div className="min-h-screen bg-white text-neutral-900">
-      {/* ── Cinematic Hero Carousel ── */}
-      <section className="relative w-full h-[560px] sm:h-[620px] lg:h-[680px] bg-neutral-950 text-white overflow-hidden">
-        {/* Background layer */}
+    <div className="min-h-screen bg-white text-neutral-900 font-sans">
+      {/* ── 100% Dynamic Cinematic Hero Carousel ── */}
+      <section className="relative w-full h-[580px] sm:h-[640px] lg:h-[700px] bg-[#090d14] text-white overflow-hidden select-none">
+        {/* Background Backdrop Image */}
         <div
-          className={`absolute inset-0 transition-opacity duration-500 ${
+          className={`absolute inset-0 transition-opacity duration-500 ease-out ${
             heroTransitioning ? "opacity-0" : "opacity-100"
           }`}
         >
           <Image
-            src={heroSlide.image}
-            alt={heroSlide.title}
+            src={currentSlide.image}
+            alt={currentSlide.title}
             fill
             priority
-            className="object-cover object-center brightness-[0.55]"
+            className="object-cover object-center filter brightness-[0.52] scale-105 transition-transform duration-7000 ease-out"
           />
-          {/* Cinematic grain overlay */}
-          <div
-            className="absolute inset-0 opacity-[0.03] pointer-events-none"
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
-            }}
-          />
-          {/* Gradient overlays */}
-          <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/30 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-r from-neutral-950/85 via-neutral-950/20 to-transparent" />
+
+          {/* Cinematic Vignette & Gradients */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#090d14] via-[#090d14]/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#090d14] via-[#090d14]/60 to-transparent" />
+          <div className="absolute inset-0 bg-radial from-transparent via-black/40 to-black/80 pointer-events-none" />
         </div>
 
-        {/* Slide indicators - top right */}
-        <div className="absolute top-6 right-6 z-20 flex items-center gap-1.5">
-          {heroSlides.map((_, idx) => (
-            <button
-              key={idx}
-              onClick={() => goToSlide(idx)}
-              className={`transition-all cursor-pointer rounded-full ${
-                activeHeroSlide === idx
-                  ? "w-6 h-1.5 bg-[#ff5500]"
-                  : "w-1.5 h-1.5 bg-white/40 hover:bg-white/70"
-              }`}
-              aria-label={`Slide ${idx + 1}`}
-            />
-          ))}
+        {/* Live Dynamic Badge Indicator */}
+        <div className="absolute top-6 left-6 z-20 flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/50 backdrop-blur-md border border-white/10 text-[10px] font-mono font-bold tracking-wider text-emerald-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            MOVEXA LIVE CINEMA
+          </span>
+          {currentSlide.isFeatured && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#ff5500]/90 backdrop-blur-md text-[10px] font-mono font-bold tracking-wider text-white">
+              <Sparkles size={11} />
+              FEATURED
+            </span>
+          )}
         </div>
 
-        {/* Prev / Next arrows */}
-        <button
-          onClick={() =>
-            goToSlide((activeHeroSlide - 1 + heroSlides.length) % heroSlides.length)
-          }
-          className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/40 hover:bg-black/70 flex items-center justify-center text-white border border-white/10 backdrop-blur-sm transition-all cursor-pointer"
-        >
-          <ChevronLeft size={20} />
-        </button>
-        <button
-          onClick={() =>
-            goToSlide((activeHeroSlide + 1) % heroSlides.length)
-          }
-          className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/40 hover:bg-black/70 flex items-center justify-center text-white border border-white/10 backdrop-blur-sm transition-all cursor-pointer"
-        >
-          <ChevronRight size={20} />
-        </button>
+        {/* Slide navigation controls - Top Right */}
+        <div className="absolute top-6 right-6 z-20 hidden sm:flex items-center gap-2 bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-3 py-1.5">
+          <span className="text-[11px] font-mono font-bold text-neutral-300">
+            {String(activeHeroSlide + 1).padStart(2, "0")} / {String(dynamicHeroSlides.length).padStart(2, "0")}
+          </span>
+          <div className="w-px h-3 bg-white/20" />
+          <button
+            onClick={() =>
+              goToSlide((activeHeroSlide - 1 + dynamicHeroSlides.length) % dynamicHeroSlides.length)
+            }
+            className="p-1 text-neutral-300 hover:text-white transition-colors cursor-pointer"
+            aria-label="Previous slide"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <button
+            onClick={() => goToSlide((activeHeroSlide + 1) % dynamicHeroSlides.length)}
+            className="p-1 text-neutral-300 hover:text-white transition-colors cursor-pointer"
+            aria-label="Next slide"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
 
-        {/* Hero content */}
+        {/* Main Hero Content */}
         <div
-          className={`relative max-w-7xl mx-auto h-full px-6 lg:px-14 flex flex-col justify-end pb-16 sm:pb-20 space-y-4 transition-opacity duration-500 ${
-            heroTransitioning ? "opacity-0" : "opacity-100"
+          className={`relative max-w-7xl mx-auto h-full px-6 lg:px-14 flex flex-col justify-end pb-20 sm:pb-24 space-y-4 transition-all duration-500 ${
+            heroTransitioning ? "opacity-0 translate-y-3" : "opacity-100 translate-y-0"
           }`}
         >
-          {/* Tags row */}
+          {/* Tag & Rating */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-mono uppercase tracking-[0.2em] px-3 py-1 rounded-full bg-[#ff5500] text-white font-bold">
-              {heroSlide.tag}
+            <span className="text-[11px] font-mono uppercase tracking-[0.2em] px-3.5 py-1 rounded-full bg-[#ff5500] text-white font-bold shadow-lg shadow-orange-950/40">
+              {currentSlide.tag}
             </span>
-            <span className="text-[11px] font-mono px-3 py-1 rounded-full bg-white/10 text-white border border-white/20 backdrop-blur-sm flex items-center gap-1.5">
+            <span className="text-[11px] font-mono px-3 py-1 rounded-full bg-white/10 text-white border border-white/15 backdrop-blur-md flex items-center gap-1.5">
               <Star size={11} className="fill-amber-400 text-amber-400" />
-              <span>{heroSlide.rating}/10</span>
+              <span>{currentSlide.rating} / 10</span>
             </span>
-            <span className="text-[11px] font-mono px-3 py-1 rounded-full bg-white/10 text-white border border-white/20 backdrop-blur-sm flex items-center gap-1.5">
+            <span className="text-[11px] font-mono px-3 py-1 rounded-full bg-white/10 text-white border border-white/15 backdrop-blur-md flex items-center gap-1.5">
               <Clock size={11} />
-              <span>{heroSlide.duration}</span>
+              <span>{currentSlide.duration}</span>
             </span>
           </div>
 
           {/* Title */}
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-white max-w-3xl leading-[1.0] drop-shadow-2xl">
-            {heroSlide.title}
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-white max-w-3xl leading-[1.02] drop-shadow-2xl">
+            {currentSlide.title}
           </h1>
 
           {/* Genre */}
-          <p className="text-xs sm:text-sm text-[#ff7733] font-semibold tracking-wider uppercase font-mono">
-            {heroSlide.genre}
+          <p className="text-xs sm:text-sm text-[#ff7733] font-bold tracking-widest uppercase font-mono">
+            {currentSlide.genre}
           </p>
 
           {/* Synopsis */}
-          <p className="text-xs sm:text-sm text-neutral-300 font-light max-w-xl leading-relaxed line-clamp-2">
-            {heroSlide.synopsis}
+          <p className="text-xs sm:text-sm text-neutral-200 font-light max-w-xl leading-relaxed line-clamp-2 drop-shadow">
+            {currentSlide.synopsis}
           </p>
 
-          {/* CTA row */}
+          {/* Action CTAs */}
           <div className="pt-2 flex flex-wrap items-center gap-3">
             <Link
-              href={`/movies/${heroSlide.slug}`}
-              className="px-7 py-3.5 bg-[#ff5500] hover:bg-[#e64d00] text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-orange-900/40 flex items-center gap-2 transition-all hover:scale-[1.03] active:scale-95"
+              href={`/movies/${currentSlide.slug}`}
+              className="px-7 py-3.5 bg-[#ff5500] hover:bg-[#e64d00] text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-xl shadow-orange-950/50 flex items-center gap-2 transition-all hover:scale-[1.03] active:scale-95"
             >
               <Ticket size={16} />
-              <span>Book Tickets</span>
+              <span>Book Tickets & Choose Seats</span>
             </Link>
-            <a
-              href="#movies"
-              className="px-5 py-3.5 bg-white/10 hover:bg-white/20 text-white font-semibold text-xs rounded-xl border border-white/20 transition-colors backdrop-blur-sm flex items-center gap-2"
-            >
-              <Play size={14} />
-              <span>All Showtimes</span>
-            </a>
-          </div>
 
-          {/* Slide counter */}
-          <p className="text-[10px] font-mono text-neutral-500 tracking-widest pt-1">
-            {String(activeHeroSlide + 1).padStart(2, "0")} /{" "}
-            {String(heroSlides.length).padStart(2, "0")}
-          </p>
+            <Link
+              href={`/movies/${currentSlide.slug}#book-tickets`}
+              className="px-5 py-3.5 bg-white/10 hover:bg-white/20 text-white font-semibold text-xs rounded-xl border border-white/20 transition-colors backdrop-blur-md flex items-center gap-2"
+            >
+              <Play size={14} className="fill-white" />
+              <span>Showtimes & Trailer</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Dynamic Thumbnail Strip (Bottom Right on Desktop) */}
+        {dynamicHeroSlides.length > 1 && (
+          <div className="absolute bottom-6 right-6 z-20 hidden md:flex items-center gap-2.5 bg-black/60 backdrop-blur-md p-2 rounded-2xl border border-white/10">
+            {dynamicHeroSlides.map((slide, idx) => {
+              const isActive = activeHeroSlide === idx;
+              return (
+                <button
+                  key={slide.id}
+                  onClick={() => goToSlide(idx)}
+                  className={`group relative w-16 h-12 rounded-xl overflow-hidden border-2 transition-all cursor-pointer text-left ${
+                    isActive
+                      ? "border-[#ff5500] scale-105 shadow-md shadow-orange-900/50"
+                      : "border-transparent opacity-60 hover:opacity-100"
+                  }`}
+                  title={slide.title}
+                >
+                  <Image src={slide.image} alt={slide.title} fill className="object-cover" />
+                  <div className="absolute inset-0 bg-black/40 group-hover:bg-transparent transition-colors" />
+                  {isActive && (
+                    <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#ff5500]" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Mobile Slide Indicator Dots */}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex md:hidden items-center gap-2">
+          {dynamicHeroSlides.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => goToSlide(idx)}
+              className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                activeHeroSlide === idx ? "w-6 bg-[#ff5500]" : "w-1.5 bg-white/40"
+              }`}
+              aria-label={`Go to slide ${idx + 1}`}
+            />
+          ))}
         </div>
       </section>
 
-      {/* ── Now Showing Banner ── */}
-      <div className="bg-neutral-950 border-t border-white/5">
-        <div className="max-w-7xl mx-auto px-6 lg:px-14 py-3 flex items-center gap-6 overflow-x-auto no-scrollbar">
-          <span className="text-[10px] font-mono uppercase tracking-widest text-[#ff5500] font-bold whitespace-nowrap shrink-0">
-            Now Playing
+      {/* ── Quick Ticker: Live Movies Now Playing ── */}
+      <div className="bg-[#0e1420] border-t border-b border-white/[0.08]">
+        <div className="max-w-7xl mx-auto px-6 lg:px-14 py-3 flex items-center gap-6 overflow-x-auto no-scrollbar text-white">
+          <span className="text-[10px] font-mono uppercase tracking-widest text-[#ff5500] font-bold whitespace-nowrap shrink-0 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#ff5500] animate-ping" />
+            LIVE SCREENINGS TODAY
           </span>
           <div className="flex items-center gap-6">
             {movies
@@ -320,19 +369,22 @@ export default function HomePage() {
                 <Link
                   key={m._id}
                   href={`/movies/${m.slug}`}
-                  className="text-[11px] text-neutral-400 hover:text-white transition-colors whitespace-nowrap font-medium"
+                  className="text-[11px] text-neutral-400 hover:text-white transition-colors whitespace-nowrap font-medium flex items-center gap-1.5 group"
                 >
-                  <span className="text-neutral-600 mr-1.5">{String(i + 1).padStart(2, "0")}.</span>
-                  {m.title}
+                  <span className="text-neutral-600 font-mono">0{i + 1}.</span>
+                  <span className="group-hover:text-[#ff7733]">{m.title}</span>
+                  {m.isFeatured && (
+                    <Sparkles size={10} className="text-[#ff5500] shrink-0" />
+                  )}
                 </Link>
               ))}
           </div>
         </div>
       </div>
 
-      {/* ── Movies Catalog ── */}
+      {/* ── Movies Catalog Section ── */}
       <section id="movies" className="max-w-7xl mx-auto px-6 lg:px-14 py-16 space-y-8">
-        {/* Section header */}
+        {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-neutral-200 pb-6">
           <div>
             <span className="text-[10px] font-mono uppercase tracking-widest text-[#ff5500] font-bold">
@@ -342,11 +394,11 @@ export default function HomePage() {
               Movies Showing Today
             </h2>
             <p className="text-xs text-neutral-500 mt-1">
-              Select any movie to view showtimes and reserve your seats.
+              Select any movie to view showtimes, trailers, and reserve seats in real time.
             </p>
           </div>
 
-          {/* Filters */}
+          {/* Filters & Search */}
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center p-1 rounded-xl bg-neutral-100 border border-neutral-200/80 text-xs">
               {["all", "now_showing", "coming_soon"].map((tab) => (
@@ -379,7 +431,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Movies grid */}
+        {/* Movies Grid */}
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
             {[1, 2, 3, 4, 5].map((i) => (
@@ -416,24 +468,24 @@ export default function HomePage() {
                     fill
                     className="object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                  {/* Hover overlay */}
+                  {/* Hover Overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
                     <span className="w-full py-2.5 bg-[#ff5500] text-white font-bold text-xs uppercase tracking-wider rounded-xl text-center shadow-md">
                       Book Seats
                     </span>
                   </div>
-                  {/* Rating badge */}
+                  {/* Rating Badge */}
                   <div className="absolute top-2.5 left-2.5 px-2 py-1 rounded-md bg-black/70 backdrop-blur-md text-[11px] font-bold text-amber-400 border border-white/10 flex items-center gap-1 font-mono">
                     <Star size={10} className="fill-amber-400 text-amber-400" />
-                    <span>{movie.rating?.toFixed(1) || "8.5"}</span>
+                    <span>{movie.rating ? movie.rating.toFixed(1) : "8.5"}</span>
                   </div>
-                  {/* Featured star */}
+                  {/* Featured Badge */}
                   {movie.isFeatured && (
                     <div className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-[#ff5500] flex items-center justify-center shadow-lg">
                       <Sparkles size={13} className="text-white" />
                     </div>
                   )}
-                  {/* Status badge */}
+                  {/* Status */}
                   <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider bg-black/70 text-white backdrop-blur-sm border border-white/10">
                     {movie.status === "now_showing" ? "● Live" : "Soon"}
                   </div>
@@ -467,7 +519,7 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* ── Cinemas Section ── */}
+      {/* ── Cinemas Showcase Section ── */}
       <section id="cinemas" className="bg-[#090d14] text-white py-20">
         <div className="max-w-7xl mx-auto px-6 lg:px-14 space-y-12">
           <div className="text-center max-w-2xl mx-auto space-y-2">
@@ -478,8 +530,7 @@ export default function HomePage() {
               Movexa Cinema Experience
             </h2>
             <p className="text-xs sm:text-sm text-neutral-400">
-              Engineered for maximum visual clarity and earth-shaking acoustic
-              precision.
+              Engineered for maximum visual clarity and earth-shaking acoustic precision.
             </p>
           </div>
 
@@ -582,17 +633,16 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Footer note if not logged in ── */}
+      {/* ── Account Call to Action ── */}
       {!user && (
         <section className="bg-[#ff5500] text-white py-12">
           <div className="max-w-4xl mx-auto px-6 lg:px-14 flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left">
             <div>
               <h3 className="text-xl font-black tracking-tight">
-                Your seat is waiting.
+                Your cinema seat is waiting.
               </h3>
               <p className="text-xs text-orange-100 mt-1 max-w-md">
-                Create a free account to book tickets, track your bookings, and
-                get instant e-tickets.
+                Create an account to book tickets, track your history, and get instant QR digital tickets.
               </p>
             </div>
             <div className="flex items-center gap-3">

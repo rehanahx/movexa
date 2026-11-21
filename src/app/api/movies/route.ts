@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import Movie from "@/models/Movie";
 import { createMovieSchema } from "@/validators/movie.validator";
+import { seedDatabase } from "@/lib/seedDatabase";
 
 export async function GET(request: NextRequest) {
     try {
@@ -11,8 +12,13 @@ export async function GET(request: NextRequest) {
         const searchParams = request.nextUrl.searchParams;
         const status = searchParams.get("status");
         const query = searchParams.get("query");
-
         const featured = searchParams.get("featured");
+
+        // Check if database is empty - auto-seed on fresh deployments like Vercel
+        const totalCount = await Movie.countDocuments();
+        if (totalCount === 0) {
+            await seedDatabase();
+        }
 
         const filter: Record<string, unknown> = {};
         if (status && status !== "all") {
@@ -29,7 +35,7 @@ export async function GET(request: NextRequest) {
             ];
         }
 
-        const movies = await Movie.find(filter).sort({ createdAt: -1 }).lean();
+        const movies = await Movie.find(filter).sort({ isFeatured: -1, createdAt: -1 }).lean();
 
         return NextResponse.json({
             success: true,

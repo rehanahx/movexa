@@ -3,8 +3,8 @@ import { connectDB } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import Movie from "@/models/Movie";
 import Show from "@/models/Show";
-import Cinema from "@/models/Cinema";
-import Screen from "@/models/Screen";
+import { ensureShowsForMovie } from "@/lib/cinemas";
+import { seedDatabase } from "@/lib/seedDatabase";
 
 export async function GET(
   request: NextRequest,
@@ -12,29 +12,85 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    await connectDB();
-
-    // ID can be slug or ObjectId
-    let movie = null;
-    if (id.match(/^[0-9a-fA-F]{24}$/)) {
-      movie = await Movie.findById(id).lean();
-    }
-    if (!movie) {
-      movie = await Movie.findOne({ slug: id }).lean();
-    }
-
-    if (!movie) {
+    if (!id) {
       return NextResponse.json(
-        { success: false, message: "Movie not found" },
+        { success: false, message: "Movie identifier is required" },
+        { status: 400 }
+      );
+    }
+
+    await connectDB();
+    const decodedId = decodeURIComponent(id).trim();
+
+    // 1. Try finding by MongoDB ObjectId
+    let movie = null;
+    if (decodedId.match(/^[0-9a-fA-F]{24}$/)) {
+      movie = await Movie.findById(decodedId).lean();
+    }
+
+    // 2. Try exact slug case-insensitive
+    if (!movie) {
+      const escaped = decodedId.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+      movie = await Movie.findOne({
+        slug: { $regex: new RegExp(`^${escaped}$`, "i") },
+      }).lean();
+    }
+
+    // 3. Try exact title case-insensitive
+    if (!movie) {
+      const escaped = decodedId.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+      movie = await Movie.findOne({
+        title: { $regex: new RegExp(`^${escaped}$`, "i") },
+      }).lean();
+    }
+
+    // 4. Try slug partial match
+    if (!movie) {
+      const escaped = decodedId.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+      movie = await Movie.findOne({
+        slug: { $regex: new RegExp(escaped, "i") },
+      }).lean();
+    }
+
+    // 5. If movie still not found, check if DB is unseeded (first time on Vercel)
+    if (!movie) {
+      const movieCount = await Movie.countDocuments();
+      if (movieCount === 0) {
+        await seedDatabase();
+        // Retry search after seeding
+        const escaped = decodedId.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+        movie = await Movie.findOne({
+          $or: [
+            { slug: { $regex: new RegExp(`^${escaped}$`, "i") } },
+            { title: { $regex: new RegExp(`^${escaped}$`, "i") } },
+            { slug: { $regex: new RegExp(escaped, "i") } },
+          ],
+        }).lean();
+      }
+    }
+
+    if (!movie) {
+      // Suggest other existing movies so frontend can link to them
+      const suggestions = await Movie.find({})
+        .select("title slug thumbnail")
+        .limit(4)
+        .lean();
+
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Movie "${decodedId}" not found`,
+          suggestions,
+        },
         { status: 404 }
       );
     }
 
-    // Also fetch upcoming shows for this movie
+    // Ensure upcoming shows exist for this movie
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const shows = await Show.find({
+    let shows = await Show.find({
       movie: (movie as any)._id,
       date: { $gte: today },
     })
@@ -42,6 +98,19 @@ export async function GET(
       .populate("screen", "name")
       .sort({ date: 1, startTime: 1 })
       .lean();
+
+    // If no upcoming shows exist, automatically schedule shows for today + next 3 days
+    if (shows.length === 0) {
+      await ensureShowsForMovie((movie as any)._id);
+      shows = await Show.find({
+        movie: (movie as any)._id,
+        date: { $gte: today },
+      })
+        .populate("cinema", "name location address")
+        .populate("screen", "name")
+        .sort({ date: 1, startTime: 1 })
+        .lean();
+    }
 
     return NextResponse.json({
       success: true,
@@ -121,7 +190,7 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      message: "Movie and associated showtimes removed successfully",
+      message: "Movie deleted successfully",
     });
   } catch (error) {
     console.error("DELETE_MOVIE_ERROR:", error);

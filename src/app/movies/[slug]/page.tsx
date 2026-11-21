@@ -3,7 +3,7 @@
 import React, { useState, useEffect, use } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   Clock,
   Calendar,
@@ -15,8 +15,9 @@ import {
   Ticket,
   Loader2,
   AlertCircle,
-  Share2,
+  Sparkles,
   X,
+  Compass,
 } from "lucide-react";
 
 interface ShowItem {
@@ -48,6 +49,12 @@ interface MovieDetails {
     url: string;
     publicId: string;
   };
+  bannerImage?: {
+    url: string;
+    publicId?: string;
+  };
+  tagline?: string;
+  isFeatured?: boolean;
   trailerUrl?: string;
   genre: string[];
   language: string;
@@ -57,21 +64,42 @@ interface MovieDetails {
   cast: string[];
   rating?: number;
   status: "now_showing" | "coming_soon" | "ended";
-  isFeatured?: boolean;
-  tagline?: string;
-  bannerImage?: { url: string; publicId?: string };
+}
+
+interface MovieSuggestion {
+  title: string;
+  slug: string;
+  thumbnail: { url: string };
 }
 
 export default function MovieDetailPage({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params?: Promise<{ slug: string }>;
 }) {
-  const { slug } = use(params);
   const router = useRouter();
+  const routeParams = useParams();
+
+  // Robust slug extraction supporting both useParams() and params Promise
+  let slug = "";
+  if (routeParams && typeof routeParams.slug === "string") {
+    slug = routeParams.slug;
+  } else if (params) {
+    try {
+      const resolved = use(params);
+      if (resolved && resolved.slug) {
+        slug = resolved.slug;
+      }
+    } catch {
+      // In case Promise isn't resolved yet
+    }
+  }
+
+  const cleanSlug = slug ? decodeURIComponent(slug).trim() : "";
 
   const [movie, setMovie] = useState<MovieDetails | null>(null);
   const [shows, setShows] = useState<ShowItem[]>([]);
+  const [suggestions, setSuggestions] = useState<MovieSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,34 +120,65 @@ export default function MovieDetailPage({
   });
 
   useEffect(() => {
+    if (!cleanSlug) return;
+
+    let isMounted = true;
     async function fetchMovieDetails() {
       setIsLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/movies/${slug}`);
+        const res = await fetch(`/api/movies/${encodeURIComponent(cleanSlug)}`);
         const data = await res.json();
 
-        if (!res.ok || !data.success) {
-          throw new Error(data.message || "Failed to load movie");
+        if (!res.ok || !data.success || !data.movie) {
+          if (data.suggestions) {
+            setSuggestions(data.suggestions);
+          }
+          throw new Error(data.message || `Movie "${cleanSlug}" not found`);
         }
 
-        setMovie(data.movie);
-        setShows(data.shows || []);
+        if (isMounted) {
+          setMovie(data.movie);
+          setShows(data.shows || []);
+        }
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Error loading movie details");
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : "Error loading movie details");
+          // Attempt to load all movies for fallback suggestions
+          fetch("/api/movies")
+            .then((r) => r.json())
+            .then((d) => {
+              if (d.success && d.movies) {
+                setSuggestions(
+                  d.movies.slice(0, 4).map((m: any) => ({
+                    title: m.title,
+                    slug: m.slug,
+                    thumbnail: m.thumbnail,
+                  }))
+                );
+              }
+            })
+            .catch(() => {});
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     }
 
     fetchMovieDetails();
-  }, [slug]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [cleanSlug]);
 
   if (isLoading) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center bg-white">
+      <div className="min-h-[80vh] flex flex-col items-center justify-center bg-[#090d14] text-white">
         <Loader2 size={36} className="animate-spin text-[#ff5500] mb-3" />
-        <p className="text-xs font-semibold text-neutral-500 uppercase tracking-widest font-mono">
+        <p className="text-xs font-semibold text-neutral-400 uppercase tracking-widest font-mono">
           Loading movie showcase...
         </p>
       </div>
@@ -128,25 +187,60 @@ export default function MovieDetailPage({
 
   if (error || !movie) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center bg-[#f8fafc]">
-        <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4">
-          <AlertCircle size={24} />
+      <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 text-center bg-[#090d14] text-white">
+        <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mb-4">
+          <AlertCircle size={28} />
         </div>
-        <h2 className="text-xl font-bold text-neutral-900 mb-2">Movie Not Found</h2>
-        <p className="text-xs text-neutral-500 max-w-sm mb-6">{error || "The movie requested does not exist or has been removed."}</p>
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-neutral-900 text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition-colors"
-        >
-          <ChevronLeft size={16} />
-          <span>Back to Home</span>
-        </Link>
+        <h2 className="text-2xl font-black text-white mb-2">Movie Details Unavailable</h2>
+        <p className="text-xs text-neutral-400 max-w-md mb-8">
+          {error || `We couldn't find the requested movie "${cleanSlug}". Please check the title or choose from one of our popular movies below.`}
+        </p>
+
+        {/* Suggested Movies */}
+        {suggestions.length > 0 && (
+          <div className="w-full max-w-2xl mb-8">
+            <span className="text-[11px] font-mono uppercase tracking-widest text-neutral-400 block mb-3">
+              Currently Available Movies:
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {suggestions.map((s) => (
+                <Link
+                  key={s.slug}
+                  href={`/movies/${s.slug}`}
+                  className="group bg-white/5 border border-white/10 hover:border-[#ff5500] rounded-xl p-3 text-left transition-all hover:scale-105"
+                >
+                  <div className="relative aspect-[2/3] w-full rounded-lg overflow-hidden mb-2 bg-neutral-900">
+                    <Image
+                      src={s.thumbnail?.url || "/images/hero-banner.jpg"}
+                      alt={s.title}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                  <p className="text-xs font-bold text-white group-hover:text-[#ff5500] truncate">
+                    {s.title}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-[#ff5500] hover:bg-[#e64d00] text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-lg"
+          >
+            <Compass size={16} />
+            <span>Browse All Movies</span>
+          </Link>
+        </div>
       </div>
     );
   }
 
   // Filter shows by selected date
-  const selectedDateStr = availableDates[selectedDateIndex].fullDateStr;
+  const selectedDateStr = availableDates[selectedDateIndex]?.fullDateStr;
   const filteredShows = shows.filter((s) => {
     const showDateStr = new Date(s.date).toISOString().split("T")[0];
     return showDateStr === selectedDateStr;
@@ -165,6 +259,9 @@ export default function MovieDetailPage({
     return acc;
   }, {} as Record<string, { cinema: any; shows: ShowItem[] }>);
 
+  const heroBackdrop =
+    movie.bannerImage?.url || movie.thumbnail?.url || "/images/hero-banner.jpg";
+
   return (
     <div className="min-h-screen bg-[#fafbfc] pb-24">
       {/* Top Breadcrumb Header */}
@@ -178,8 +275,14 @@ export default function MovieDetailPage({
             <span>All Movies</span>
           </Link>
           <div className="flex items-center gap-3">
+            {movie.isFeatured && (
+              <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-orange-50 text-[#ff5500] font-bold border border-orange-200 uppercase flex items-center gap-1">
+                <Sparkles size={11} />
+                Featured Premiere
+              </span>
+            )}
             <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-neutral-100 text-neutral-700 font-semibold border border-neutral-200 uppercase">
-              {movie.status === "now_showing" ? "Now Showing" : "Coming Soon"}
+              {movie.status === "now_showing" ? "● Now Showing" : "Coming Soon"}
             </span>
           </div>
         </div>
@@ -187,15 +290,15 @@ export default function MovieDetailPage({
 
       {/* Hero Showcase Section */}
       <div className="relative bg-[#090d14] text-white overflow-hidden">
-        {/* Ambient Backdrop Blurred — use bannerImage if featured */}
+        {/* Ambient Backdrop Blurred */}
         <div className="absolute inset-0 opacity-30">
           <Image
-            src={(movie as any).bannerImage?.url || movie.thumbnail?.url || "/images/hero-banner.jpg"}
+            src={heroBackdrop}
             alt={movie.title}
             fill
             className="object-cover filter blur-2xl scale-110"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#090d14] via-[#090d14]/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#090d14] via-[#090d14]/70 to-transparent" />
         </div>
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-10 lg:py-16">
@@ -224,9 +327,9 @@ export default function MovieDetailPage({
             {/* Movie Meta Information */}
             <div className="md:col-span-8 lg:col-span-9 space-y-4">
               <div className="flex flex-wrap items-center gap-2">
-                {(movie as any).isFeatured && (movie as any).tagline && (
+                {movie.tagline && (
                   <span className="text-[11px] font-mono uppercase tracking-[0.2em] px-3 py-1 rounded-full bg-[#ff5500] text-white font-bold">
-                    {(movie as any).tagline}
+                    {movie.tagline}
                   </span>
                 )}
                 {movie.genre?.map((g) => (
@@ -311,12 +414,12 @@ export default function MovieDetailPage({
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-neutral-900 font-sans flex items-center gap-2">
             <span>Select Date & Showtime</span>
-            <span className="text-xs font-mono font-normal text-neutral-400 px-2 py-0.5 rounded-md bg-neutral-100">
-              Live Availability
+            <span className="text-xs font-mono font-normal text-emerald-700 px-2.5 py-0.5 rounded-md bg-emerald-50 border border-emerald-200">
+              Live Real-Time Booking
             </span>
           </h2>
           <p className="text-xs text-neutral-500 mt-1">
-            Choose your preferred date, theater auditorium, and time slot to book your reserved seats.
+            Choose your preferred date, cinema auditorium, and time slot to reserve your seats in real time.
           </p>
         </div>
 
@@ -355,15 +458,17 @@ export default function MovieDetailPage({
               <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center mx-auto mb-3">
                 <Calendar size={22} />
               </div>
-              <h3 className="text-base font-bold text-neutral-900">No Showtimes on {availableDates[selectedDateIndex].dayName}</h3>
+              <h3 className="text-base font-bold text-neutral-900">
+                No Showtimes on {availableDates[selectedDateIndex]?.dayName}
+              </h3>
               <p className="text-xs text-neutral-500 max-w-sm mx-auto mt-1 leading-relaxed">
-                Showtimes for this day have not been scheduled yet or tickets are sold out. Please select another date.
+                Please select another date tab above to view scheduled screenings.
               </p>
             </div>
           ) : (
             Object.values(groupedShowsByCinema).map(({ cinema, shows: cinemaShows }) => (
               <div
-                key={cinema?._id}
+                key={cinema?._id || Math.random()}
                 className="bg-white border border-neutral-200 rounded-2xl p-6 sm:p-7 shadow-xs hover:shadow-sm transition-shadow space-y-5"
               >
                 {/* Cinema Info */}
@@ -371,16 +476,16 @@ export default function MovieDetailPage({
                   <div className="space-y-1">
                     <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2">
                       <Film size={18} className="text-[#ff5500]" />
-                      <span>{cinema?.name || "Movexa Cinema"}</span>
+                      <span>{cinema?.name || "Movexa Grand IMAX & Dolby"}</span>
                     </h3>
                     <p className="text-xs text-neutral-500 flex items-center gap-1.5">
                       <MapPin size={13} className="text-neutral-400 shrink-0" />
-                      <span>{cinema?.address || cinema?.location}</span>
+                      <span>{cinema?.address || cinema?.location || "Main Auditorium"}</span>
                     </p>
                   </div>
                   <div className="flex items-center gap-2 text-[11px] font-mono text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200/60 w-fit">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>M-Ticket & E-Pass Supported</span>
+                    <span>Instant E-Ticket & QR Admission</span>
                   </div>
                 </div>
 
@@ -391,7 +496,8 @@ export default function MovieDetailPage({
                   </span>
                   <div className="flex flex-wrap items-center gap-3">
                     {cinemaShows.map((show) => {
-                      const availableCount = show.seats?.filter((s) => s.status === "available").length ?? 60;
+                      const availableCount =
+                        show.seats?.filter((s) => s.status === "available").length ?? 60;
                       return (
                         <Link
                           key={show._id}
@@ -402,7 +508,7 @@ export default function MovieDetailPage({
                             {show.startTime}
                           </span>
                           <span className="text-[10px] text-neutral-500 font-medium mt-0.5">
-                            {show.screen?.name || "Screen 1"}
+                            {show.screen?.name || "Auditorium Screen 1"}
                           </span>
                           <span className="text-[10px] font-mono text-emerald-600 font-semibold mt-1">
                             {availableCount} seats left
@@ -426,7 +532,7 @@ export default function MovieDetailPage({
               <span className="text-sm font-bold text-white">{movie.title} — Official Trailer</span>
               <button
                 onClick={() => setShowTrailerModal(false)}
-                className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors"
+                className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>

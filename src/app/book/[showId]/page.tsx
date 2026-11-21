@@ -3,7 +3,7 @@
 import React, { useState, useEffect, use, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   ChevronLeft,
   Film,
@@ -124,10 +124,25 @@ function SeatIcon({
 export default function BookShowPage({
   params,
 }: {
-  params: Promise<{ showId: string }>;
+  params?: Promise<{ showId: string }>;
 }) {
-  const { showId } = use(params);
   const router = useRouter();
+  const routeParams = useParams();
+
+  let showId = "";
+  if (routeParams && typeof routeParams.showId === "string") {
+    showId = routeParams.showId;
+  } else if (params) {
+    try {
+      const resolved = use(params);
+      if (resolved && resolved.showId) {
+        showId = resolved.showId;
+      }
+    } catch {
+      // safe fallback
+    }
+  }
+
   const { user } = useAuth();
 
   const [show, setShow] = useState<ShowDetail | null>(null);
@@ -146,6 +161,7 @@ export default function BookShowPage({
 
   // Fetch show
   useEffect(() => {
+    if (!showId) return;
     async function fetchShow() {
       setIsLoading(true);
       setError(null);
