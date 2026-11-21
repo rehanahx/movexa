@@ -57,6 +57,9 @@ interface MovieDetails {
   cast: string[];
   rating?: number;
   status: "now_showing" | "coming_soon" | "ended";
+  isFeatured?: boolean;
+  tagline?: string;
+  bannerImage?: { url: string; publicId?: string };
 }
 
 export default function MovieDetailPage({
@@ -184,15 +187,15 @@ export default function MovieDetailPage({
 
       {/* Hero Showcase Section */}
       <div className="relative bg-[#090d14] text-white overflow-hidden">
-        {/* Ambient Backdrop Blurred */}
-        <div className="absolute inset-0 opacity-25">
+        {/* Ambient Backdrop Blurred — use bannerImage if featured */}
+        <div className="absolute inset-0 opacity-30">
           <Image
-            src={movie.thumbnail?.url || "/images/hero-banner.jpg"}
+            src={(movie as any).bannerImage?.url || movie.thumbnail?.url || "/images/hero-banner.jpg"}
             alt={movie.title}
             fill
             className="object-cover filter blur-2xl scale-110"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#090d14] via-[#090d14]/70 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#090d14] via-[#090d14]/60 to-transparent" />
         </div>
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-10 lg:py-16">
@@ -221,6 +224,11 @@ export default function MovieDetailPage({
             {/* Movie Meta Information */}
             <div className="md:col-span-8 lg:col-span-9 space-y-4">
               <div className="flex flex-wrap items-center gap-2">
+                {(movie as any).isFeatured && (movie as any).tagline && (
+                  <span className="text-[11px] font-mono uppercase tracking-[0.2em] px-3 py-1 rounded-full bg-[#ff5500] text-white font-bold">
+                    {(movie as any).tagline}
+                  </span>
+                )}
                 {movie.genre?.map((g) => (
                   <span
                     key={g}

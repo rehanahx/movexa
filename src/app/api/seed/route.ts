@@ -148,6 +148,12 @@ export async function POST(request: Request) {
           url: "/images/dune-hero.jpg",
           publicId: "seed-dune-2",
         },
+        bannerImage: {
+          url: "/images/dune-hero.jpg",
+          publicId: "seed-dune-2-banner",
+        },
+        isFeatured: true,
+        tagline: "NOW SHOWING IN IMAX 70MM",
         trailerUrl: "https://www.youtube.com/watch?v=Way9Dexny3w",
         genre: ["Action", "Adventure", "Sci-Fi", "Drama"],
         language: "English",
@@ -167,6 +173,12 @@ export async function POST(request: Request) {
           url: "/images/cinema-auth.jpg",
           publicId: "seed-oppenheimer",
         },
+        bannerImage: {
+          url: "/images/cinema-auth.jpg",
+          publicId: "seed-oppenheimer-banner",
+        },
+        isFeatured: true,
+        tagline: "SPECIAL 4K LASER SCREENING",
         trailerUrl: "https://www.youtube.com/watch?v=uYPbbksJxIg",
         genre: ["Biography", "Drama", "History"],
         language: "English",
@@ -186,6 +198,12 @@ export async function POST(request: Request) {
           url: "/images/poster-noir.jpg",
           publicId: "seed-silent-frequency",
         },
+        bannerImage: {
+          url: "/images/poster-noir.jpg",
+          publicId: "seed-silent-frequency-banner",
+        },
+        isFeatured: true,
+        tagline: "PREMIERE SELECTION",
         trailerUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
         genre: ["Neo-Noir", "Mystery", "Thriller"],
         language: "English",
@@ -260,6 +278,16 @@ export async function POST(request: Request) {
       let existing = await Movie.findOne({ slug: movData.slug });
       if (!existing) {
         existing = await Movie.create(movData);
+      } else {
+        // Update featured fields on existing movies
+        if ((movData as any).isFeatured !== undefined) {
+          existing.isFeatured = (movData as any).isFeatured;
+          existing.tagline = (movData as any).tagline;
+          if ((movData as any).bannerImage) {
+            existing.bannerImage = (movData as any).bannerImage;
+          }
+          await existing.save();
+        }
       }
       savedMovies.push(existing);
     }

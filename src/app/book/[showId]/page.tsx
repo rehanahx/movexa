@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, use } from "react";
+import React, { useState, useEffect, use, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -17,9 +17,7 @@ import {
   CreditCard,
   QrCode,
   ShieldCheck,
-  Sparkles,
   X,
-  Printer,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -58,6 +56,71 @@ interface ShowDetail {
   seats: Seat[];
 }
 
+// ── Seat shape SVG component ──────────────────────────────────────────────────
+function SeatIcon({
+  isBooked,
+  isSelected,
+  isPremium,
+  size = 32,
+}: {
+  isBooked: boolean;
+  isSelected: boolean;
+  isPremium: boolean;
+  size?: number;
+}) {
+  const fill = isBooked
+    ? "#2a2a2a"
+    : isSelected
+    ? "#ff5500"
+    : isPremium
+    ? "#2d1f00"
+    : "#1e2430";
+
+  const stroke = isBooked
+    ? "#3a3a3a"
+    : isSelected
+    ? "#ff7733"
+    : isPremium
+    ? "#b45309"
+    : "#334155";
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Seat back / headrest */}
+      <rect x="4" y="2" width="24" height="5" rx="3" fill={stroke} opacity="0.7" />
+      {/* Main seat body */}
+      <rect x="3" y="7" width="26" height="16" rx="4" fill={fill} stroke={stroke} strokeWidth="1.5" />
+      {/* Armrests */}
+      <rect x="1" y="9" width="4" height="10" rx="2" fill={stroke} opacity="0.5" />
+      <rect x="27" y="9" width="4" height="10" rx="2" fill={stroke} opacity="0.5" />
+      {/* Seat cushion crease */}
+      {!isBooked && (
+        <rect x="8" y="13" width="16" height="2" rx="1" fill={isSelected ? "#ff7733" : isPremium ? "#b45309" : "#2a3444"} opacity="0.6" />
+      )}
+      {/* X mark for booked */}
+      {isBooked && (
+        <>
+          <line x1="10" y1="10" x2="22" y2="20" stroke="#555" strokeWidth="2" strokeLinecap="round" />
+          <line x1="22" y1="10" x2="10" y2="20" stroke="#555" strokeWidth="2" strokeLinecap="round" />
+        </>
+      )}
+      {/* Glow dot for selected */}
+      {isSelected && (
+        <circle cx="16" cy="15" r="4" fill="#ff7733" opacity="0.6" />
+      )}
+      {/* Legs */}
+      <rect x="8" y="23" width="4" height="6" rx="1.5" fill={stroke} opacity="0.4" />
+      <rect x="20" y="23" width="4" height="6" rx="1.5" fill={stroke} opacity="0.4" />
+    </svg>
+  );
+}
+
 export default function BookShowPage({
   params,
 }: {
@@ -70,18 +133,18 @@ export default function BookShowPage({
   const [show, setShow] = useState<ShowDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Selected seats state
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
+  const [hoveredSeat, setHoveredSeat] = useState<Seat | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
-  // Checkout modal states
+  // Checkout modal
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"card" | "upi" | "counter">("card");
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState<any | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
-  // Fetch show details
+  // Fetch show
   useEffect(() => {
     async function fetchShow() {
       setIsLoading(true);
@@ -89,11 +152,9 @@ export default function BookShowPage({
       try {
         const res = await fetch(`/api/shows/${showId}`);
         const data = await res.json();
-
         if (!res.ok || !data.success) {
           throw new Error(data.message || "Failed to load showtime details");
         }
-
         setShow(data.show);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Error fetching showtime");
@@ -101,59 +162,46 @@ export default function BookShowPage({
         setIsLoading(false);
       }
     }
-
     fetchShow();
   }, [showId]);
 
-  // Handle seat click
-  const toggleSeat = (seat: Seat) => {
+  const toggleSeat = useCallback((seat: Seat) => {
     if (seat.status === "booked") return;
-
-    const isAlreadySelected = selectedSeats.some(
-      (s) => s.row === seat.row && s.number === seat.number
-    );
-
-    if (isAlreadySelected) {
-      setSelectedSeats(
-        selectedSeats.filter(
-          (s) => !(s.row === seat.row && s.number === seat.number)
-        )
+    setSelectedSeats((prev) => {
+      const isAlreadySelected = prev.some(
+        (s) => s.row === seat.row && s.number === seat.number
       );
-    } else {
-      if (selectedSeats.length >= 8) {
-        alert("You can select up to 8 seats per booking transaction.");
-        return;
+      if (isAlreadySelected) {
+        return prev.filter((s) => !(s.row === seat.row && s.number === seat.number));
       }
-      setSelectedSeats([...selectedSeats, seat]);
-    }
-  };
+      if (prev.length >= 8) {
+        alert("Max 8 seats per booking.");
+        return prev;
+      }
+      return [...prev, seat];
+    });
+  }, []);
 
-  // Group seats by rows
+  // Group by rows
   const rowsMap = (show?.seats || []).reduce((acc, seat) => {
-    if (!acc[seat.row]) {
-      acc[seat.row] = [];
-    }
+    if (!acc[seat.row]) acc[seat.row] = [];
     acc[seat.row].push(seat);
     return acc;
   }, {} as Record<string, Seat[]>);
 
-  // Sort rows alphabetically
   const sortedRowKeys = Object.keys(rowsMap).sort();
 
-  // Price calculation
   const subtotal = selectedSeats.reduce((sum, s) => sum + s.price, 0);
   const bookingFee = selectedSeats.length > 0 ? 30 : 0;
   const grandTotal = subtotal + bookingFee;
 
-  // Handle Booking submission
   const handleProceedToPayment = () => {
     if (!user) {
-      // Prompt user to sign in
       router.push(`/login?redirect=/book/${showId}`);
       return;
     }
     if (selectedSeats.length === 0) {
-      alert("Please select at least one seat to proceed.");
+      alert("Please select at least one seat.");
       return;
     }
     setIsCheckoutOpen(true);
@@ -162,7 +210,6 @@ export default function BookShowPage({
   const handleConfirmBooking = async () => {
     setIsProcessingPayment(true);
     setCheckoutError(null);
-
     try {
       const res = await fetch("/api/bookings", {
         method: "POST",
@@ -178,25 +225,16 @@ export default function BookShowPage({
           paymentMethod,
         }),
       });
-
       const data = await res.json();
-
       if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to confirm ticket reservation");
+        throw new Error(data.message || "Failed to confirm reservation");
       }
-
       setConfirmedBooking(data.booking);
-      // Mark locally booked seats
       if (show) {
-        const bookedKeys = new Set(
-          selectedSeats.map((s) => `${s.row}-${s.number}`)
+        const bookedKeys = new Set(selectedSeats.map((s) => `${s.row}-${s.number}`));
+        const updatedSeats = show.seats.map((s) =>
+          bookedKeys.has(`${s.row}-${s.number}`) ? { ...s, status: "booked" as const } : s
         );
-        const updatedSeats = show.seats.map((s) => {
-          if (bookedKeys.has(`${s.row}-${s.number}`)) {
-            return { ...s, status: "booked" as const };
-          }
-          return s;
-        });
         setShow({ ...show, seats: updatedSeats });
       }
       setSelectedSeats([]);
@@ -209,7 +247,7 @@ export default function BookShowPage({
 
   if (isLoading) {
     return (
-      <div className="min-h-[80vh] flex flex-col items-center justify-center bg-white">
+      <div className="min-h-[80vh] flex flex-col items-center justify-center bg-[#0d1117]">
         <Loader2 size={36} className="animate-spin text-[#ff5500] mb-3" />
         <p className="text-xs uppercase tracking-widest text-neutral-500 font-mono">
           Loading auditorium layout...
@@ -220,15 +258,17 @@ export default function BookShowPage({
 
   if (error || !show) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center bg-[#f8fafc]">
-        <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4">
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center bg-[#0d1117]">
+        <div className="w-12 h-12 rounded-xl bg-rose-950 text-rose-500 flex items-center justify-center mb-4">
           <AlertCircle size={24} />
         </div>
-        <h2 className="text-xl font-bold text-neutral-900 mb-2">Showtime Unavailable</h2>
-        <p className="text-xs text-neutral-500 max-w-sm mb-6">{error || "This show is no longer active."}</p>
+        <h2 className="text-xl font-bold text-white mb-2">Showtime Unavailable</h2>
+        <p className="text-xs text-neutral-500 max-w-sm mb-6">
+          {error || "This show is no longer active."}
+        </p>
         <Link
           href="/"
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-neutral-900 text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition-colors"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-neutral-800 text-white text-xs font-semibold rounded-lg hover:bg-neutral-700 transition-colors"
         >
           <ChevronLeft size={16} />
           <span>Return to Movies</span>
@@ -237,136 +277,268 @@ export default function BookShowPage({
     );
   }
 
+  const premiumRowKeys = sortedRowKeys.slice(-2);
+  const regularRowKeys = sortedRowKeys.slice(0, -2);
+  const totalSeats = show.seats.length;
+  const bookedCount = show.seats.filter((s) => s.status === "booked").length;
+  const availableCount = totalSeats - bookedCount;
+  const occupancyPct = Math.round((bookedCount / totalSeats) * 100);
+
   return (
-    <div className="min-h-screen bg-[#0d1117] text-white flex flex-col justify-between">
-      {/* Top Header Bar */}
-      <header className="sticky top-0 z-40 bg-[#161b22]/90 backdrop-blur-md border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-3 flex items-center justify-between">
+    <div className="min-h-screen bg-[#0a0d13] text-white flex flex-col">
+      {/* ── Top Header ── */}
+      <header className="sticky top-0 z-40 bg-[#0d1117]/95 backdrop-blur-md border-b border-white/[0.07]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.back()}
-              className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
+              className="w-8 h-8 rounded-lg bg-white/8 hover:bg-white/15 flex items-center justify-center text-white transition-colors cursor-pointer border border-white/10"
             >
               <ChevronLeft size={18} />
             </button>
             <div>
-              <h1 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
+              <h1 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2 flex-wrap">
                 <span>{show.movie?.title}</span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#ff5500]/20 text-[#ff7733] border border-[#ff5500]/30">
                   {show.screen?.name || "Auditorium"}
                 </span>
               </h1>
-              <p className="text-[11px] text-neutral-400 flex items-center gap-2 mt-0.5">
-                <span>{show.cinema?.name}</span>
-                <span>•</span>
-                <span>{new Date(show.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span>
-                <span>•</span>
-                <span className="text-white font-semibold">{show.startTime}</span>
+              <p className="text-[11px] text-neutral-500 flex items-center gap-2 mt-0.5 flex-wrap">
+                <span className="flex items-center gap-1">
+                  <MapPin size={10} />
+                  {show.cinema?.name}
+                </span>
+                <span>·</span>
+                <span className="flex items-center gap-1">
+                  <Calendar size={10} />
+                  {new Date(show.date).toLocaleDateString("en-US", {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </span>
+                <span>·</span>
+                <span className="flex items-center gap-1 text-white font-semibold">
+                  <Clock size={10} />
+                  {show.startTime}
+                </span>
               </p>
             </div>
           </div>
-
-          <div className="hidden sm:flex items-center gap-4 text-xs font-medium">
-            <span className="text-neutral-400">Step 2 of 2: Reserve Seats</span>
+          <div className="hidden sm:flex items-center gap-3 text-xs text-neutral-500">
+            <span className="font-mono">
+              <span className="text-emerald-400 font-bold">{availableCount}</span> seats available
+            </span>
+            <div className="w-20 h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div
+                className="h-full bg-[#ff5500] rounded-full transition-all"
+                style={{ width: `${occupancyPct}%` }}
+              />
+            </div>
+            <span className="font-mono text-[#ff7733]">{occupancyPct}% full</span>
           </div>
         </div>
       </header>
 
-      {/* Main Seat Map Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-12 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column: Interactive Seat Chart */}
-        <div className="lg:col-span-8 flex flex-col items-center">
-          {/* Cinema Curved Glowing Screen */}
-          <div className="w-full max-w-2xl mb-12 flex flex-col items-center">
-            <div className="w-full h-2.5 rounded-full bg-gradient-to-r from-transparent via-[#ff5500] to-transparent shadow-[0_0_25px_rgba(255,85,0,0.8)] mb-2" />
-            <div className="w-5/6 h-6 border-t-2 border-white/20 rounded-[50%] opacity-50" />
-            <span className="text-[10px] tracking-[0.3em] uppercase text-neutral-400 font-mono font-semibold mt-1">
-              ALL EYES THIS WAY • CINEMA SCREEN
+      {/* ── Main Layout ── */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-10 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* ── Left: Auditorium Map ── */}
+        <div className="lg:col-span-8 flex flex-col items-center select-none">
+
+          {/* Distance indicator */}
+          <p className="text-[10px] font-mono uppercase tracking-widest text-neutral-600 mb-5">
+            ← Optimal viewing distance from screen →
+          </p>
+
+          {/* SCREEN */}
+          <div className="w-full max-w-[640px] mb-10 flex flex-col items-center">
+            <div className="w-full h-3 rounded-full bg-gradient-to-r from-transparent via-[#ff5500] to-transparent shadow-[0_0_30px_8px_rgba(255,85,0,0.5)]" />
+            <div className="w-[85%] h-8 border-t-2 border-white/10 rounded-[50%]"
+              style={{ boxShadow: "0 -6px 20px rgba(255,85,0,0.1)" }}
+            />
+            <span className="mt-1 text-[9px] tracking-[0.4em] uppercase text-neutral-600 font-mono font-bold">
+              SCREEN — FRONT OF AUDITORIUM
             </span>
           </div>
 
-          {/* Seat Grid Chart */}
-          <div className="w-full overflow-x-auto pb-4 no-scrollbar flex flex-col items-center">
-            <div className="min-w-[480px] space-y-3.5">
-              {sortedRowKeys.map((rowKey) => {
-                const rowSeats = rowsMap[rowKey].sort((a, b) => a.number - b.number);
-                const isPremiumRow = rowKey === "F" || rowKey === "G";
+          {/* Tooltip (hover) */}
+          {hoveredSeat && hoveredSeat.status !== "booked" && (
+            <div
+              className="fixed z-50 pointer-events-none bg-[#1a2033] border border-white/20 rounded-xl px-3 py-2 text-xs shadow-2xl"
+              style={{ left: tooltipPos.x + 14, top: tooltipPos.y - 48 }}
+            >
+              <span className="font-mono font-bold text-white">
+                Row {hoveredSeat.row} · Seat {hoveredSeat.number}
+              </span>
+              <span className="ml-2 text-[#ff7733] font-semibold">
+                {hoveredSeat.type === "premium" ? "Premium VIP" : "Regular"}
+              </span>
+              <span className="ml-2 text-emerald-400 font-mono font-bold">₹{hoveredSeat.price}</span>
+            </div>
+          )}
 
-                return (
-                  <div key={rowKey} className="flex items-center justify-center gap-2 sm:gap-3">
-                    {/* Row Letter Left */}
-                    <span className="w-6 text-center text-xs font-mono font-bold text-neutral-400 select-none">
-                      {rowKey}
-                    </span>
+          {/* ── REGULAR SECTION ── */}
+          <div className="w-full max-w-[640px] space-y-2 mb-6">
+            {regularRowKeys.map((rowKey, rowIdx) => {
+              const rowSeats = rowsMap[rowKey].sort((a, b) => a.number - b.number);
+              // Slight indent to simulate perspective curve (front rows wider view)
+              const indent = Math.max(0, (regularRowKeys.length - 1 - rowIdx) * 2);
+              return (
+                <div
+                  key={rowKey}
+                  className="flex items-center justify-center gap-1.5"
+                  style={{ paddingLeft: indent, paddingRight: indent }}
+                >
+                  {/* Row label left */}
+                  <span className="w-5 text-center text-[10px] font-mono font-bold text-neutral-600 select-none shrink-0">
+                    {rowKey}
+                  </span>
 
-                    {/* Seat Buttons */}
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                      {rowSeats.map((seat) => {
-                        const isBooked = seat.status === "booked";
-                        const isSelected = selectedSeats.some(
-                          (s) => s.row === seat.row && s.number === seat.number
-                        );
-
-                        return (
+                  <div className="flex items-center gap-1">
+                    {rowSeats.map((seat, seatIdx) => {
+                      const isBooked = seat.status === "booked";
+                      const isSelected = selectedSeats.some(
+                        (s) => s.row === seat.row && s.number === seat.number
+                      );
+                      // Aisle gap after seat 5
+                      const showAisle = seatIdx === 4;
+                      return (
+                        <React.Fragment key={`${seat.row}-${seat.number}`}>
+                          {showAisle && <div className="w-4 shrink-0" />}
                           <button
-                            key={`${seat.row}-${seat.number}`}
                             disabled={isBooked}
                             onClick={() => toggleSeat(seat)}
-                            title={`Row ${seat.row} Seat ${seat.number} (${seat.type} - ₹${seat.price})`}
-                            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-md text-[10px] sm:text-[11px] font-mono font-semibold transition-all flex items-center justify-center select-none cursor-pointer ${
-                              isBooked
-                                ? "bg-neutral-800/80 text-neutral-600 border border-neutral-700/50 cursor-not-allowed opacity-40 line-through"
-                                : isSelected
-                                ? "bg-[#ff5500] text-white border-2 border-[#ff7733] shadow-[0_0_12px_rgba(255,85,0,0.7)] scale-110 z-10"
-                                : isPremiumRow
-                                ? "bg-amber-950/40 text-amber-200 border border-amber-600/40 hover:border-amber-400 hover:bg-amber-900/50"
-                                : "bg-neutral-900 text-neutral-300 border border-neutral-700 hover:border-neutral-400 hover:bg-neutral-800"
-                            }`}
+                            onMouseEnter={(e) => {
+                              setHoveredSeat(seat);
+                              setTooltipPos({ x: e.clientX, y: e.clientY });
+                            }}
+                            onMouseLeave={() => setHoveredSeat(null)}
+                            onMouseMove={(e) =>
+                              setTooltipPos({ x: e.clientX, y: e.clientY })
+                            }
+                            className={`relative transition-all duration-150 cursor-pointer disabled:cursor-not-allowed outline-none group
+                              ${isSelected ? "scale-110 drop-shadow-[0_0_8px_rgba(255,85,0,0.9)]" : ""}
+                              ${isBooked ? "opacity-30" : "hover:scale-110 hover:drop-shadow-[0_0_6px_rgba(255,85,0,0.5)]"}
+                            `}
+                            title={`${seat.row}${seat.number} · ${seat.type} · ₹${seat.price}`}
                           >
-                            {seat.number}
+                            <SeatIcon
+                              isBooked={isBooked}
+                              isSelected={isSelected}
+                              isPremium={false}
+                              size={28}
+                            />
                           </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Row Letter Right */}
-                    <span className="w-6 text-center text-xs font-mono font-bold text-neutral-400 select-none">
-                      {rowKey}
-                    </span>
+                        </React.Fragment>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
+
+                  {/* Row label right */}
+                  <span className="w-5 text-center text-[10px] font-mono font-bold text-neutral-600 select-none shrink-0">
+                    {rowKey}
+                  </span>
+                </div>
+              );
+            })}
           </div>
 
-          {/* Seat Status Legend */}
-          <div className="mt-10 p-4 rounded-xl bg-white/5 border border-white/10 flex flex-wrap items-center justify-center gap-6 text-xs text-neutral-300">
-            <div className="flex items-center gap-2">
-              <span className="w-4 h-4 rounded-md bg-neutral-900 border border-neutral-700" />
-              <span>Available (₹250)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-4 h-4 rounded-md bg-amber-950/60 border border-amber-500/50" />
-              <span>Premium VIP (₹450)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-4 h-4 rounded-md bg-[#ff5500] border border-[#ff7733] shadow-[0_0_6px_rgba(255,85,0,0.8)]" />
-              <span className="text-[#ff7733] font-semibold">Selected</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-4 h-4 rounded-md bg-neutral-800 text-neutral-500 border border-neutral-700/50 line-through flex items-center justify-center text-[9px]">
-                X
+          {/* ── PREMIUM DIVIDER ── */}
+          <div className="w-full max-w-[640px] flex items-center gap-3 my-3">
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-amber-700/60 to-transparent" />
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-amber-900/30 border border-amber-700/40">
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-amber-500">
+                Premium VIP Recliners · ₹450
               </span>
-              <span>Reserved</span>
+            </div>
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-amber-700/60 to-transparent" />
+          </div>
+
+          {/* ── PREMIUM SECTION ── */}
+          <div className="w-full max-w-[640px] space-y-2">
+            {premiumRowKeys.map((rowKey) => {
+              const rowSeats = rowsMap[rowKey].sort((a, b) => a.number - b.number);
+              return (
+                <div key={rowKey} className="flex items-center justify-center gap-1.5">
+                  <span className="w-5 text-center text-[10px] font-mono font-bold text-amber-700 select-none shrink-0">
+                    {rowKey}
+                  </span>
+
+                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-950/20 border border-amber-900/30">
+                    {rowSeats.map((seat, seatIdx) => {
+                      const isBooked = seat.status === "booked";
+                      const isSelected = selectedSeats.some(
+                        (s) => s.row === seat.row && s.number === seat.number
+                      );
+                      const showAisle = seatIdx === 4;
+                      return (
+                        <React.Fragment key={`${seat.row}-${seat.number}`}>
+                          {showAisle && <div className="w-5 shrink-0" />}
+                          <button
+                            disabled={isBooked}
+                            onClick={() => toggleSeat(seat)}
+                            onMouseEnter={(e) => {
+                              setHoveredSeat(seat);
+                              setTooltipPos({ x: e.clientX, y: e.clientY });
+                            }}
+                            onMouseLeave={() => setHoveredSeat(null)}
+                            onMouseMove={(e) =>
+                              setTooltipPos({ x: e.clientX, y: e.clientY })
+                            }
+                            className={`relative transition-all duration-150 cursor-pointer disabled:cursor-not-allowed outline-none
+                              ${isSelected ? "scale-110 drop-shadow-[0_0_10px_rgba(245,158,11,0.9)]" : ""}
+                              ${isBooked ? "opacity-30" : "hover:scale-110 hover:drop-shadow-[0_0_6px_rgba(245,158,11,0.6)]"}
+                            `}
+                            title={`${seat.row}${seat.number} · Premium VIP · ₹${seat.price}`}
+                          >
+                            <SeatIcon
+                              isBooked={isBooked}
+                              isSelected={isSelected}
+                              isPremium={true}
+                              size={32}
+                            />
+                          </button>
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+
+                  <span className="w-5 text-center text-[10px] font-mono font-bold text-amber-700 select-none shrink-0">
+                    {rowKey}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── LEGEND ── */}
+          <div className="mt-10 w-full max-w-[640px] p-4 rounded-2xl bg-white/[0.03] border border-white/[0.07] flex flex-wrap items-center justify-center gap-6 text-xs text-neutral-400">
+            <div className="flex items-center gap-2">
+              <SeatIcon isBooked={false} isSelected={false} isPremium={false} size={22} />
+              <span>Available <span className="text-neutral-600 font-mono">(₹250)</span></span>
+            </div>
+            <div className="flex items-center gap-2">
+              <SeatIcon isBooked={false} isSelected={false} isPremium={true} size={22} />
+              <span>Premium VIP <span className="text-neutral-600 font-mono">(₹450)</span></span>
+            </div>
+            <div className="flex items-center gap-2">
+              <SeatIcon isBooked={false} isSelected={true} isPremium={false} size={22} />
+              <span className="text-[#ff7733] font-semibold">Your Selection</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <SeatIcon isBooked={true} isSelected={false} isPremium={false} size={22} />
+              <span className="text-neutral-600">Reserved</span>
             </div>
           </div>
         </div>
 
-        {/* Right Column: Order Summary Card */}
+        {/* ── Right: Order Summary ── */}
         <div className="lg:col-span-4 w-full sticky top-20">
-          <div className="bg-[#161b22] border border-white/10 rounded-2xl p-6 shadow-2xl space-y-6">
-            <div className="flex items-start gap-3.5 border-b border-white/10 pb-5">
-              <div className="relative w-16 h-22 rounded-lg overflow-hidden shrink-0 border border-white/10">
+          <div className="bg-[#141922] border border-white/[0.08] rounded-2xl p-6 shadow-2xl space-y-5">
+            {/* Movie info */}
+            <div className="flex items-start gap-3.5 border-b border-white/[0.07] pb-5">
+              <div className="relative w-14 h-20 rounded-lg overflow-hidden shrink-0 border border-white/10">
                 <Image
                   src={show.movie?.thumbnail?.url || "/images/hero-banner.jpg"}
                   alt={show.movie?.title || "Movie"}
@@ -374,203 +546,207 @@ export default function BookShowPage({
                   className="object-cover"
                 />
               </div>
-              <div className="space-y-1">
-                <h3 className="text-base font-bold text-white leading-tight">
+              <div className="space-y-1 min-w-0">
+                <h3 className="text-sm font-bold text-white leading-tight truncate">
                   {show.movie?.title}
                 </h3>
-                <p className="text-xs text-neutral-400">
-                  {show.movie?.language} • {show.movie?.duration} mins
+                <p className="text-[11px] text-neutral-500">
+                  {show.movie?.language} · {show.movie?.duration} min
                 </p>
-                <p className="text-xs text-[#ff7733] font-medium font-sans">
+                <p className="text-[11px] text-[#ff7733] font-medium font-mono">
                   {show.screen?.name}
                 </p>
               </div>
             </div>
 
-            {/* Screening Details */}
+            {/* Show details */}
             <div className="space-y-2 text-xs">
-              <div className="flex justify-between py-1 text-neutral-300">
-                <span className="text-neutral-500">Theater</span>
-                <span className="font-medium text-white text-right">{show.cinema?.name}</span>
-              </div>
-              <div className="flex justify-between py-1 text-neutral-300">
-                <span className="text-neutral-500">Date</span>
-                <span className="font-medium text-white">
-                  {new Date(show.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                </span>
-              </div>
-              <div className="flex justify-between py-1 text-neutral-300">
-                <span className="text-neutral-500">Time</span>
-                <span className="font-medium text-white">{show.startTime}</span>
-              </div>
+              {[
+                { label: "Theater", value: show.cinema?.name },
+                {
+                  label: "Date",
+                  value: new Date(show.date).toLocaleDateString("en-US", {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                  }),
+                },
+                { label: "Time", value: show.startTime },
+              ].map((row) => (
+                <div key={row.label} className="flex justify-between py-0.5">
+                  <span className="text-neutral-600">{row.label}</span>
+                  <span className="font-medium text-neutral-200 text-right max-w-[55%] truncate">
+                    {row.value}
+                  </span>
+                </div>
+              ))}
             </div>
 
-            {/* Selected Seats Badges */}
-            <div className="border-t border-white/10 pt-4 space-y-2">
+            {/* Selected seats */}
+            <div className="border-t border-white/[0.07] pt-4 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
-                  Seats Chosen ({selectedSeats.length})
+                <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
+                  Selected Seats ({selectedSeats.length})
                 </span>
                 {selectedSeats.length > 0 && (
                   <button
                     onClick={() => setSelectedSeats([])}
                     className="text-[11px] text-[#ff7733] hover:underline cursor-pointer"
                   >
-                    Clear all
+                    Clear
                   </button>
                 )}
               </div>
 
               {selectedSeats.length === 0 ? (
-                <p className="text-xs text-neutral-500 italic py-2">
-                  No seats selected yet. Click on the seat chart to reserve.
-                </p>
+                <div className="py-4 text-center border border-dashed border-white/10 rounded-xl">
+                  <Film size={18} className="mx-auto text-neutral-700 mb-1" />
+                  <p className="text-[11px] text-neutral-600">
+                    Click seats on the map to reserve
+                  </p>
+                </div>
               ) : (
-                <div className="flex flex-wrap gap-1.5 py-1">
+                <div className="flex flex-wrap gap-1.5">
                   {selectedSeats.map((s) => (
                     <span
                       key={`${s.row}-${s.number}`}
-                      className="px-2.5 py-1 rounded-md bg-[#ff5500]/20 text-[#ff7733] border border-[#ff5500]/40 text-xs font-mono font-bold flex items-center gap-1.5"
+                      className="px-2.5 py-1 rounded-lg bg-[#ff5500]/15 text-[#ff7733] border border-[#ff5500]/30 text-xs font-mono font-bold flex items-center gap-1.5"
                     >
-                      <span>{s.row}{s.number}</span>
-                      <span className="text-[10px] text-neutral-400 font-normal">₹{s.price}</span>
+                      <span>
+                        {s.row}
+                        {s.number}
+                      </span>
+                      <span className="text-[10px] text-neutral-500 font-normal">
+                        ₹{s.price}
+                      </span>
                     </span>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Total Price Breakdown */}
-            <div className="border-t border-white/10 pt-4 space-y-2 text-xs">
-              <div className="flex justify-between text-neutral-400">
+            {/* Price breakdown */}
+            <div className="border-t border-white/[0.07] pt-4 space-y-2 text-xs">
+              <div className="flex justify-between text-neutral-500">
                 <span>Tickets Subtotal</span>
-                <span className="text-white font-mono font-medium">₹{subtotal}</span>
+                <span className="font-mono text-neutral-300">₹{subtotal}</span>
               </div>
-              <div className="flex justify-between text-neutral-400">
-                <span>Convenience & Tech Fee</span>
-                <span className="text-white font-mono font-medium">₹{bookingFee}</span>
+              <div className="flex justify-between text-neutral-500">
+                <span>Convenience Fee</span>
+                <span className="font-mono text-neutral-300">₹{bookingFee}</span>
               </div>
-              <div className="flex justify-between text-base font-extrabold text-white border-t border-white/10 pt-3">
-                <span>Grand Total</span>
+              <div className="flex justify-between text-base font-extrabold text-white border-t border-white/[0.07] pt-3">
+                <span>Total</span>
                 <span className="text-[#ff5500] font-mono text-lg">₹{grandTotal}</span>
               </div>
             </div>
 
-            {/* Action CTA Button */}
+            {/* CTA */}
             <button
               onClick={handleProceedToPayment}
               disabled={selectedSeats.length === 0}
-              className="w-full py-3.5 px-4 bg-[#ff5500] hover:bg-[#e64d00] disabled:opacity-40 disabled:hover:bg-[#ff5500] text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-orange-950/40 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+              className="w-full py-3.5 px-4 bg-[#ff5500] hover:bg-[#e64d00] disabled:opacity-35 disabled:hover:bg-[#ff5500] text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-orange-900/40 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed active:scale-95"
             >
               <Ticket size={16} />
-              <span>{user ? `Book ${selectedSeats.length} Seat(s) • ₹${grandTotal}` : "Sign In to Complete Booking"}</span>
+              <span>
+                {user
+                  ? selectedSeats.length > 0
+                    ? `Pay ₹${grandTotal} · ${selectedSeats.length} Seat${selectedSeats.length > 1 ? "s" : ""}`
+                    : "Select Seats to Continue"
+                  : "Sign In to Book"}
+              </span>
             </button>
           </div>
         </div>
       </main>
 
-      {/* Checkout Payment Modal */}
+      {/* ── Checkout Modal ── */}
       {isCheckoutOpen && !confirmedBooking && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="relative w-full max-w-lg bg-[#161b22] border border-white/15 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="relative w-full max-w-lg bg-[#141922] border border-white/15 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-[#ff5500]/20 text-[#ff5500] flex items-center justify-center">
                   <CreditCard size={18} />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white">Payment & Confirmation</h3>
-                  <p className="text-xs text-neutral-400">Finalize your ticket reservation</p>
+                  <p className="text-xs text-neutral-500">Finalize your ticket reservation</p>
                 </div>
               </div>
               <button
                 onClick={() => setIsCheckoutOpen(false)}
-                className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-lg bg-white/8 text-neutral-400 flex items-center justify-center hover:bg-white/15 hover:text-white transition-colors cursor-pointer"
               >
                 <X size={16} />
               </button>
             </div>
 
             {checkoutError && (
-              <div className="p-3 bg-rose-500/20 border border-rose-500/40 rounded-xl text-xs text-rose-300 flex items-center gap-2">
+              <div className="p-3 bg-rose-500/15 border border-rose-500/30 rounded-xl text-xs text-rose-400 flex items-center gap-2">
                 <AlertCircle size={15} className="shrink-0" />
                 <span>{checkoutError}</span>
               </div>
             )}
 
-            {/* Payment Method Selector */}
+            {/* Payment Methods */}
             <div className="space-y-3">
-              <label className="text-xs font-semibold text-neutral-300 uppercase tracking-wider block">
-                Choose Payment Method
+              <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block">
+                Payment Method
               </label>
               <div className="grid grid-cols-3 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod("card")}
-                  className={`p-3 rounded-xl border text-center transition-all cursor-pointer ${
-                    paymentMethod === "card"
-                      ? "border-[#ff5500] bg-[#ff5500]/10 text-white font-semibold"
-                      : "border-white/10 bg-white/5 text-neutral-400 hover:border-white/20"
-                  }`}
-                >
-                  <CreditCard size={20} className="mx-auto mb-1 text-[#ff7733]" />
-                  <span className="text-xs block">Card</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod("upi")}
-                  className={`p-3 rounded-xl border text-center transition-all cursor-pointer ${
-                    paymentMethod === "upi"
-                      ? "border-[#ff5500] bg-[#ff5500]/10 text-white font-semibold"
-                      : "border-white/10 bg-white/5 text-neutral-400 hover:border-white/20"
-                  }`}
-                >
-                  <QrCode size={20} className="mx-auto mb-1 text-emerald-400" />
-                  <span className="text-xs block">UPI / QR</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod("counter")}
-                  className={`p-3 rounded-xl border text-center transition-all cursor-pointer ${
-                    paymentMethod === "counter"
-                      ? "border-[#ff5500] bg-[#ff5500]/10 text-white font-semibold"
-                      : "border-white/10 bg-white/5 text-neutral-400 hover:border-white/20"
-                  }`}
-                >
-                  <Ticket size={20} className="mx-auto mb-1 text-blue-400" />
-                  <span className="text-xs block">At Counter</span>
-                </button>
+                {(["card", "upi", "counter"] as const).map((m) => {
+                  const icons = {
+                    card: <CreditCard size={20} className="text-[#ff7733]" />,
+                    upi: <QrCode size={20} className="text-emerald-400" />,
+                    counter: <Ticket size={20} className="text-blue-400" />,
+                  };
+                  const labels = { card: "Card", upi: "UPI / QR", counter: "At Counter" };
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => setPaymentMethod(m)}
+                      className={`p-3 rounded-xl border text-center transition-all cursor-pointer ${
+                        paymentMethod === m
+                          ? "border-[#ff5500] bg-[#ff5500]/10 text-white"
+                          : "border-white/10 bg-white/5 text-neutral-500 hover:border-white/20"
+                      }`}
+                    >
+                      <div className="mx-auto mb-1 w-5 h-5 flex items-center justify-center">
+                        {icons[m]}
+                      </div>
+                      <span className="text-xs font-semibold block">{labels[m]}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Mock Payment Details */}
+            {/* Card mock fields */}
             {paymentMethod === "card" && (
-              <div className="space-y-3 p-4 rounded-xl bg-white/5 border border-white/10 text-xs">
+              <div className="space-y-3 p-4 rounded-xl bg-white/[0.03] border border-white/[0.07] text-xs">
                 <div>
-                  <label className="block text-neutral-400 mb-1">Card Number (Demo prefilled)</label>
+                  <label className="block text-neutral-500 mb-1">Card Number</label>
                   <input
-                    type="text"
                     readOnly
                     value="4532 •••• •••• 8892"
-                    className="w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white font-mono"
+                    className="w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white font-mono text-sm"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-neutral-400 mb-1">Expiry</label>
+                    <label className="block text-neutral-500 mb-1">Expiry</label>
                     <input
-                      type="text"
                       readOnly
                       value="12/28"
                       className="w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block text-neutral-400 mb-1">CVV</label>
+                    <label className="block text-neutral-500 mb-1">CVV</label>
                     <input
-                      type="text"
                       readOnly
-                      value="842"
+                      value="•••"
                       className="w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white font-mono"
                     />
                   </div>
@@ -578,27 +754,27 @@ export default function BookShowPage({
               </div>
             )}
 
+            {/* UPI mock */}
             {paymentMethod === "upi" && (
-              <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-center space-y-2">
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.07] text-center space-y-2">
                 <div className="w-28 h-28 bg-white p-2 rounded-xl mx-auto flex items-center justify-center">
-                  <QrCode size={90} className="text-neutral-900" />
+                  <QrCode size={88} className="text-neutral-900" />
                 </div>
-                <p className="text-xs text-neutral-300">Scan QR Code using any UPI App</p>
+                <p className="text-xs text-neutral-400">Scan with any UPI App</p>
                 <p className="text-[11px] font-mono text-emerald-400">movexa@instantpay</p>
               </div>
             )}
 
-            {/* Total Due */}
-            <div className="flex items-center justify-between p-3.5 bg-neutral-900 rounded-xl border border-white/10">
-              <span className="text-xs text-neutral-400">Total Payable Amount</span>
+            {/* Total */}
+            <div className="flex items-center justify-between p-3.5 bg-black/30 rounded-xl border border-white/[0.07]">
+              <span className="text-xs text-neutral-500">Total Payable</span>
               <span className="text-lg font-bold font-mono text-[#ff5500]">₹{grandTotal}</span>
             </div>
 
-            {/* Confirm Submit */}
             <button
               onClick={handleConfirmBooking}
               disabled={isProcessingPayment}
-              className="w-full py-3.5 bg-[#ff5500] hover:bg-[#e64d00] text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-3.5 bg-[#ff5500] hover:bg-[#e64d00] text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95"
             >
               {isProcessingPayment ? (
                 <>
@@ -608,7 +784,7 @@ export default function BookShowPage({
               ) : (
                 <>
                   <ShieldCheck size={16} />
-                  <span>Pay ₹{grandTotal} & Book Seats</span>
+                  <span>Pay ₹{grandTotal} & Confirm Seats</span>
                 </>
               )}
             </button>
@@ -616,11 +792,10 @@ export default function BookShowPage({
         </div>
       )}
 
-      {/* Confirmed Booking E-Ticket Modal */}
+      {/* ── Confirmed E-Ticket ── */}
       {confirmedBooking && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="relative w-full max-w-md bg-[#161b22] border border-white/20 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-5 animate-in zoom-in-95">
-            {/* Success Icon */}
+        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="relative w-full max-w-md bg-[#141922] border border-white/20 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-5">
             <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto">
               <Check size={32} />
             </div>
@@ -629,57 +804,59 @@ export default function BookShowPage({
               <span className="text-[11px] font-mono uppercase tracking-widest text-emerald-400 font-semibold block">
                 TICKETS CONFIRMED
               </span>
-              <h2 className="text-2xl font-black text-white mt-1">
-                Booking Reference: {confirmedBooking.bookingReference}
+              <h2 className="text-xl font-black text-white mt-1">
+                {confirmedBooking.bookingReference}
               </h2>
-              <p className="text-xs text-neutral-400 mt-1">
-                A digital pass has been issued and stored in your profile.
+              <p className="text-xs text-neutral-500 mt-1">
+                Your digital pass has been stored in your profile.
               </p>
             </div>
 
-            {/* Digital Ticket Card Preview */}
-            <div className="bg-white text-neutral-900 rounded-2xl p-5 text-left space-y-3.5 shadow-xl relative overflow-hidden">
+            {/* E-ticket preview */}
+            <div className="bg-white text-neutral-900 rounded-2xl p-5 text-left space-y-3.5 shadow-xl">
               <div className="flex items-center justify-between border-b border-neutral-200 pb-3">
                 <div>
-                  <span className="text-[10px] font-extrabold tracking-wider text-[#ff5500] uppercase font-mono">
-                    MOVEXA DIGITAL ADMISSION
+                  <span className="text-[9px] font-extrabold tracking-wider text-[#ff5500] uppercase font-mono block">
+                    MOVEXA DIGITAL PASS
                   </span>
-                  <h4 className="text-base font-black tracking-tight">{confirmedBooking.movieTitle}</h4>
+                  <h4 className="text-sm font-black tracking-tight">
+                    {confirmedBooking.movieTitle}
+                  </h4>
                 </div>
                 <div className="w-12 h-12 bg-neutral-100 p-1 rounded-lg border border-neutral-300 flex items-center justify-center">
                   <QrCode size={36} className="text-neutral-900" />
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <span className="text-[10px] text-neutral-500 block uppercase">Cinema</span>
-                  <strong className="text-neutral-900 text-xs">{confirmedBooking.cinemaName}</strong>
+                  <strong className="text-xs">{confirmedBooking.cinemaName}</strong>
                 </div>
                 <div>
-                  <span className="text-[10px] text-neutral-500 block uppercase">Showtime</span>
-                  <strong className="text-neutral-900 text-xs">{confirmedBooking.showTime}</strong>
+                  <span className="text-[10px] text-neutral-500 block uppercase">Time</span>
+                  <strong className="text-xs">{confirmedBooking.showTime}</strong>
                 </div>
                 <div className="col-span-2">
                   <span className="text-[10px] text-neutral-500 block uppercase">Seats</span>
-                  <strong className="text-neutral-900 font-mono text-sm">
-                    {confirmedBooking.seats?.map((s: any) => `${s.row}${s.number}`).join(", ")}
+                  <strong className="font-mono text-sm">
+                    {confirmedBooking.seats
+                      ?.map((s: any) => `${s.row}${s.number}`)
+                      .join(", ")}
                   </strong>
                 </div>
               </div>
             </div>
 
-            {/* Buttons */}
-            <div className="pt-2 flex flex-col gap-2.5">
+            <div className="flex flex-col gap-2.5 pt-1">
               <Link
                 href="/bookings"
-                className="w-full py-3 bg-[#ff5500] hover:bg-[#e64d00] text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors text-center shadow-md"
+                className="w-full py-3 bg-[#ff5500] hover:bg-[#e64d00] text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors text-center"
               >
-                Go to My Bookings
+                View My Bookings
               </Link>
               <Link
                 href="/"
-                className="w-full py-2.5 bg-white/10 hover:bg-white/20 text-neutral-300 text-xs font-semibold rounded-xl transition-colors text-center"
+                className="w-full py-2.5 bg-white/8 hover:bg-white/15 text-neutral-400 text-xs font-semibold rounded-xl transition-colors text-center"
               >
                 Book Another Movie
               </Link>
@@ -690,3 +867,4 @@ export default function BookShowPage({
     </div>
   );
 }
+

@@ -12,9 +12,14 @@ export async function GET(request: NextRequest) {
         const status = searchParams.get("status");
         const query = searchParams.get("query");
 
+        const featured = searchParams.get("featured");
+
         const filter: Record<string, unknown> = {};
         if (status && status !== "all") {
             filter.status = status;
+        }
+        if (featured === "true") {
+            filter.isFeatured = true;
         }
         if (query) {
             filter.$or = [
