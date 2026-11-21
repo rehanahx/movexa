@@ -14,10 +14,8 @@ import {
   Clapperboard,
   Trash2,
   Sparkles,
-  X,
-  Check,
-  ImageIcon,
-  Tag,
+  Edit,
+  Eye,
 } from "lucide-react";
 
 interface MovieItem {
@@ -25,7 +23,7 @@ interface MovieItem {
   title: string;
   slug: string;
   shortDescription: string;
-  thumbnail: { url: string; publicId: string };
+  thumbnail: { url: string; publicId?: string };
   bannerImage?: { url: string; publicId?: string };
   tagline?: string;
   isFeatured?: boolean;
@@ -40,13 +38,6 @@ interface MovieItem {
   createdAt: string;
 }
 
-const BANNER_PRESETS = [
-  { label: "Dune Hero", url: "/images/dune-hero.jpg" },
-  { label: "Cinema Auth", url: "/images/cinema-auth.jpg" },
-  { label: "Poster Noir", url: "/images/poster-noir.jpg" },
-  { label: "Hero Banner", url: "/images/hero-banner.jpg" },
-];
-
 export default function AdminMoviesPage() {
   const [movies, setMovies] = useState<MovieItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -54,13 +45,7 @@ export default function AdminMoviesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  // Featured modal state
-  const [featuredModal, setFeaturedModal] = useState<MovieItem | null>(null);
-  const [featuredBannerUrl, setFeaturedBannerUrl] = useState("");
-  const [featuredTagline, setFeaturedTagline] = useState("");
-  const [isSavingFeatured, setIsSavingFeatured] = useState(false);
-  const [featuredError, setFeaturedError] = useState<string | null>(null);
+  const [togglingFeaturedId, setTogglingFeaturedId] = useState<string | null>(null);
 
   const fetchMovies = useCallback(async () => {
     setIsLoading(true);
@@ -86,7 +71,9 @@ export default function AdminMoviesPage() {
   }, [fetchMovies]);
 
   const handleDeleteMovie = async (id: string, title: string) => {
-    if (!confirm(`Delete "${title}"? This will also remove scheduled showtimes.`)) return;
+    if (!confirm(`Are you sure you want to delete "${title}"? This will also remove any scheduled showtimes.`)) {
+      return;
+    }
     setDeletingId(id);
     try {
       const res = await fetch(`/api/movies/${id}`, { method: "DELETE" });
@@ -100,49 +87,27 @@ export default function AdminMoviesPage() {
     }
   };
 
-  const openFeaturedModal = (movie: MovieItem) => {
-    setFeaturedModal(movie);
-    setFeaturedBannerUrl(movie.bannerImage?.url || movie.thumbnail.url);
-    setFeaturedTagline(movie.tagline || "");
-    setFeaturedError(null);
-  };
-
-  const handleSaveFeatured = async (setFeatured: boolean) => {
-    if (!featuredModal) return;
-    setIsSavingFeatured(true);
-    setFeaturedError(null);
+  const handleQuickToggleFeatured = async (movie: MovieItem) => {
+    setTogglingFeaturedId(movie._id);
+    const newFeatured = !movie.isFeatured;
     try {
-      const res = await fetch(`/api/movies/${featuredModal._id}`, {
+      const res = await fetch(`/api/movies/${movie._id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          isFeatured: setFeatured,
-          bannerImage: setFeatured
-            ? { url: featuredBannerUrl, publicId: "admin-banner" }
-            : undefined,
-          tagline: setFeatured ? featuredTagline : "",
+          isFeatured: newFeatured,
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || "Failed to update featured status");
-      // Update local state
+
       setMovies((prev) =>
-        prev.map((m) =>
-          m._id === featuredModal._id
-            ? {
-                ...m,
-                isFeatured: setFeatured,
-                bannerImage: setFeatured ? { url: featuredBannerUrl } : undefined,
-                tagline: setFeatured ? featuredTagline : "",
-              }
-            : m
-        )
+        prev.map((m) => (m._id === movie._id ? { ...m, isFeatured: newFeatured } : m))
       );
-      setFeaturedModal(null);
     } catch (err: unknown) {
-      setFeaturedError(err instanceof Error ? err.message : "Error updating movie");
+      alert(err instanceof Error ? err.message : "Error toggling featured status");
     } finally {
-      setIsSavingFeatured(false);
+      setTogglingFeaturedId(null);
     }
   };
 
@@ -176,21 +141,21 @@ export default function AdminMoviesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-[#0f172a] tracking-tight">Movies Directory</h1>
+          <h1 className="text-2xl font-black text-[#0f172a] tracking-tight">Movies Management</h1>
           <p className="text-xs text-[#64748b] mt-1">
-            Manage movie listings, featured status, and release metadata.
+            Create, edit, feature, and manage movie listings and box office presentation.
           </p>
         </div>
         <Link
           href="/admin/movies/new"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#ff5500] hover:bg-[#e64d00] text-white font-semibold text-xs rounded-lg transition-colors shadow-sm cursor-pointer w-fit"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#ff5500] hover:bg-[#e64d00] text-white font-semibold text-xs rounded-xl transition-colors shadow-sm cursor-pointer w-fit"
         >
           <Plus size={15} />
           <span>Add New Movie</span>
         </Link>
       </div>
 
-      {/* Filters */}
+      {/* Filters Bar */}
       <div className="bg-white border border-[#e8ecf2] rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="relative w-full sm:w-80">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
@@ -219,7 +184,7 @@ export default function AdminMoviesPage() {
         </div>
       </div>
 
-      {/* Error */}
+      {/* Error Banner */}
       {error && (
         <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2">
           <AlertCircle size={16} />
@@ -238,8 +203,15 @@ export default function AdminMoviesPage() {
           <Clapperboard size={32} className="mx-auto text-slate-400" />
           <h3 className="text-base font-bold text-slate-800">No movies found</h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            No movie records match your current filters.
+            No movie records match your current filters. Add a new movie to start scheduling shows.
           </p>
+          <Link
+            href="/admin/movies/new"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#ff5500] text-white text-xs font-semibold rounded-lg shadow-sm"
+          >
+            <Plus size={14} />
+            <span>Create Movie</span>
+          </Link>
         </div>
       ) : (
         <div className="bg-white border border-[#e8ecf2] rounded-xl shadow-sm overflow-hidden">
@@ -261,22 +233,24 @@ export default function AdminMoviesPage() {
                   <tr key={m._id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
+                        {/* Poster thumbnail - 2:3 aspect ratio */}
                         <div className="relative w-10 h-14 rounded-md overflow-hidden bg-slate-900 shrink-0 border border-slate-200">
                           <Image
                             src={m.thumbnail?.url || "/images/hero-banner.jpg"}
                             alt={m.title}
                             fill
                             className="object-cover"
+                            sizes="40px"
                           />
                         </div>
-                        <div>
-                          <p className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                            {m.title}
+                        <div className="min-w-0 max-w-xs">
+                          <p className="font-bold text-slate-900 text-sm truncate flex items-center gap-1.5">
+                            <span>{m.title}</span>
                             {m.isFeatured && (
-                              <Sparkles size={12} className="text-[#ff5500]" />
+                              <Sparkles size={12} className="text-[#ff5500] shrink-0" />
                             )}
                           </p>
-                          <p className="text-[11px] text-slate-400">{m.slug}</p>
+                          <p className="text-[11px] text-slate-400 font-mono truncate">{m.slug}</p>
                         </div>
                       </div>
                     </td>
@@ -295,37 +269,46 @@ export default function AdminMoviesPage() {
                     </td>
                     <td className="py-3 px-4">{getStatusBadge(m.status)}</td>
                     <td className="py-3 px-4">
-                      {m.isFeatured ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-orange-50 text-orange-700 border border-orange-300">
-                          <Sparkles size={10} />
-                          Featured
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-slate-400">—</span>
-                      )}
+                      <button
+                        onClick={() => handleQuickToggleFeatured(m)}
+                        disabled={togglingFeaturedId === m._id}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer border ${
+                          m.isFeatured
+                            ? "bg-orange-50 text-[#ff5500] border-orange-200 hover:bg-orange-100"
+                            : "bg-slate-50 text-slate-400 border-slate-200 hover:text-slate-700 hover:bg-slate-100"
+                        }`}
+                        title="Click to toggle featured status"
+                      >
+                        {togglingFeaturedId === m._id ? (
+                          <Loader2 size={11} className="animate-spin text-[#ff5500]" />
+                        ) : (
+                          <Sparkles size={11} className={m.isFeatured ? "text-[#ff5500]" : ""} />
+                        )}
+                        <span>{m.isFeatured ? "Featured" : "Standard"}</span>
+                      </button>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {/* Featured toggle button */}
-                        <button
-                          onClick={() => openFeaturedModal(m)}
-                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer text-xs font-semibold flex items-center gap-1 ${
-                            m.isFeatured
-                              ? "border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100"
-                              : "border-slate-200 hover:bg-slate-100 text-slate-500"
-                          }`}
-                          title={m.isFeatured ? "Edit featured settings" : "Set as featured"}
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* Edit Movie */}
+                        <Link
+                          href={`/admin/movies/${m._id}/edit`}
+                          className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors"
+                          title="Edit movie & banner"
                         >
-                          <Sparkles size={13} />
-                        </button>
+                          <Edit size={13} />
+                        </Link>
+
+                        {/* Preview Public Page */}
                         <Link
                           href={`/movies/${m.slug}`}
                           target="_blank"
                           className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors"
-                          title="Preview public page"
+                          title="View public page"
                         >
-                          <ExternalLink size={13} />
+                          <Eye size={13} />
                         </Link>
+
+                        {/* Delete Movie */}
                         <button
                           onClick={() => handleDeleteMovie(m._id, m.title)}
                           disabled={deletingId === m._id}
@@ -344,153 +327,6 @@ export default function AdminMoviesPage() {
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── Featured Movie Modal ── */}
-      {featuredModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-            {/* Modal header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-orange-50 to-white">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[#ff5500]/10 text-[#ff5500] flex items-center justify-center">
-                  <Sparkles size={18} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">Featured Movie Settings</h3>
-                  <p className="text-[11px] text-slate-500">{featuredModal.title}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setFeaturedModal(null)}
-                className="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200 cursor-pointer"
-              >
-                <X size={15} />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-5">
-              {featuredError && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2">
-                  <AlertCircle size={14} />
-                  <span>{featuredError}</span>
-                </div>
-              )}
-
-              {/* Current banner preview */}
-              <div>
-                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <ImageIcon size={13} />
-                  Hero Banner Image (16:9 widescreen)
-                </label>
-                {featuredBannerUrl && (
-                  <div className="relative w-full h-32 rounded-xl overflow-hidden bg-slate-900 border border-slate-200 mb-3">
-                    <Image
-                      src={featuredBannerUrl}
-                      alt="Banner preview"
-                      fill
-                      className="object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent flex items-center px-4">
-                      <span className="text-white text-xs font-bold drop-shadow">
-                        {featuredModal.title}
-                      </span>
-                    </div>
-                  </div>
-                )}
-                {/* Preset selector */}
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                  {BANNER_PRESETS.map((p) => (
-                    <button
-                      key={p.url}
-                      onClick={() => setFeaturedBannerUrl(p.url)}
-                      className={`relative h-16 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
-                        featuredBannerUrl === p.url
-                          ? "border-[#ff5500] ring-2 ring-orange-200"
-                          : "border-slate-200 hover:border-slate-400"
-                      }`}
-                    >
-                      <Image src={p.url} alt={p.label} fill className="object-cover" />
-                      <div className="absolute inset-0 bg-black/40 flex items-end p-1.5">
-                        <span className="text-white text-[10px] font-mono font-bold">
-                          {p.label}
-                        </span>
-                      </div>
-                      {featuredBannerUrl === p.url && (
-                        <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-[#ff5500] flex items-center justify-center">
-                          <Check size={11} className="text-white" />
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-                {/* Custom URL */}
-                <input
-                  type="url"
-                  placeholder="Or paste a custom image URL..."
-                  value={featuredBannerUrl}
-                  onChange={(e) => setFeaturedBannerUrl(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-[#ff5500]"
-                />
-              </div>
-
-              {/* Tagline */}
-              <div>
-                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Tag size={13} />
-                  Tagline / Badge Text
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. NOW SHOWING IN IMAX 70MM"
-                  value={featuredTagline}
-                  onChange={(e) => setFeaturedTagline(e.target.value)}
-                  maxLength={60}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-[#ff5500] font-mono uppercase"
-                />
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Appears as a badge on the hero carousel — keep it short and punchy
-                </p>
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex gap-3 pt-2">
-                {featuredModal.isFeatured ? (
-                  <>
-                    <button
-                      onClick={() => handleSaveFeatured(true)}
-                      disabled={isSavingFeatured || !featuredBannerUrl}
-                      className="flex-1 py-2.5 bg-[#ff5500] hover:bg-[#e64d00] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                    >
-                      {isSavingFeatured ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                      Update Featured
-                    </button>
-                    <button
-                      onClick={() => handleSaveFeatured(false)}
-                      disabled={isSavingFeatured}
-                      className="px-4 py-2.5 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 font-semibold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer disabled:opacity-50 border border-slate-200"
-                    >
-                      Remove Featured
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => handleSaveFeatured(true)}
-                    disabled={isSavingFeatured || !featuredBannerUrl}
-                    className="flex-1 py-2.5 bg-[#ff5500] hover:bg-[#e64d00] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  >
-                    {isSavingFeatured ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Sparkles size={14} />
-                    )}
-                    Set as Featured
-                  </button>
-                )}
-              </div>
-            </div>
           </div>
         </div>
       )}

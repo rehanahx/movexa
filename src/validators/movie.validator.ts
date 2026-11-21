@@ -21,24 +21,38 @@ export const createMovieSchema = z.object({
     shortDescription: z
         .string()
         .trim()
-        .min(20, "Short description must be at least 20 characters")
-        .max(200, "Short description cannot exceed 200 characters"),
+        .min(10, "Short description must be at least 10 characters")
+        .max(300, "Short description cannot exceed 300 characters"),
 
     longDescription: z
         .string()
         .trim()
-        .min(50, "Long description must be at least 50 characters")
-        .max(1000, "Long description cannot exceed 1000 characters"),
+        .min(20, "Long description must be at least 20 characters")
+        .max(2000, "Long description cannot exceed 2000 characters"),
 
     thumbnail: z.object({
-        url: z.string().url("Invalid thumbnail URL"),
-        publicId: z.string().min(1, "Cloudinary public ID is required"),
+        url: z.string().min(1, "Thumbnail image URL is required"),
+        publicId: z.string().optional().default("poster"),
     }),
+
+    bannerImage: z
+        .object({
+            url: z.string().min(1, "Banner image URL is required"),
+            publicId: z.string().optional().default("banner"),
+        })
+        .optional()
+        .nullable(),
+
+    isFeatured: z.boolean().optional().default(false),
+
+    tagline: z.string().trim().optional().nullable(),
 
     trailerUrl: z
         .string()
-        .url("Invalid trailer URL")
-        .optional(),
+        .trim()
+        .optional()
+        .nullable()
+        .or(z.literal("")),
 
     genre: z
         .array(z.string().trim().min(1))
@@ -54,16 +68,14 @@ export const createMovieSchema = z.object({
         .int("Duration must be a whole number")
         .positive("Duration must be greater than 0"),
 
-    releaseDate: z
-        .string()
-        .datetime({
-            offset: true,
-        }),
+    releaseDate: z.string(),
 
     director: z
         .string()
         .trim()
-        .optional(),
+        .optional()
+        .nullable()
+        .or(z.literal("")),
 
     cast: z
         .array(z.string().trim().min(1))
@@ -73,9 +85,10 @@ export const createMovieSchema = z.object({
         .number()
         .min(0)
         .max(10)
-        .optional(),
+        .optional()
+        .nullable(),
 
-    status: movieStatusSchema.optional(),
+    status: movieStatusSchema.optional().default("now_showing"),
 });
 
 export type CreateMovieInput = z.infer<typeof createMovieSchema>;

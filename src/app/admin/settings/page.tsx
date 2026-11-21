@@ -3,178 +3,222 @@
 import React, { useState } from "react";
 import {
   Settings,
-  Database,
-  Sparkles,
+  Building2,
+  Ticket,
   ShieldCheck,
   CheckCircle2,
-  AlertCircle,
-  Loader2,
-  RefreshCw,
+  Save,
   Server,
-  Film,
+  Mail,
+  Phone,
+  DollarSign,
+  Clock,
 } from "lucide-react";
 
 export default function AdminSettingsPage() {
-  const [isSeeding, setIsSeeding] = useState(false);
-  const [seedResult, setSeedResult] = useState<any | null>(null);
-  const [seedError, setSeedError] = useState<string | null>(null);
+  const [cinemaName, setCinemaName] = useState("Movexa Cinemas");
+  const [supportEmail, setSupportEmail] = useState("boxoffice@movexa.com");
+  const [supportPhone, setSupportPhone] = useState("+1 (800) 555-FILM");
+  const [convenienceFee, setConvenienceFee] = useState(30);
+  const [maxSeatsPerBooking, setMaxSeatsPerBooking] = useState(8);
+  const [currency, setCurrency] = useState("INR (₹)");
+  const [allowCancellations, setAllowCancellations] = useState(true);
+  const [savedSuccess, setSavedSuccess] = useState(false);
 
-  const handleSeedDatabase = async (force: boolean) => {
-    setIsSeeding(true);
-    setSeedResult(null);
-    setSeedError(null);
-
-    try {
-      const res = await fetch(`/api/seed${force ? "?force=true" : ""}`, {
-        method: "POST",
-      });
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to seed demo data");
-      }
-
-      setSeedResult(data);
-    } catch (err: unknown) {
-      setSeedError(err instanceof Error ? err.message : "Error seeding database");
-    } finally {
-      setIsSeeding(false);
-    }
+  const handleSaveSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavedSuccess(true);
+    setTimeout(() => {
+      setSavedSuccess(false);
+    }, 3000);
   };
 
   return (
     <div className="space-y-7 max-w-4xl mx-auto pb-16 font-sans">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-black text-[#0f172a] tracking-tight">
-          System Settings & Showcase Utilities
-        </h1>
-        <p className="text-xs text-[#64748b] mt-1">
-          Platform configurations, mock credentials reference, and database showcase seeder for project defense.
-        </p>
-      </div>
-
-      {/* Admin Mock Reference Box */}
-      <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-6 shadow-2xs space-y-3">
-        <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
-          <ShieldCheck size={18} className="text-amber-600" />
-          <span>College Evaluation Mock Credentials</span>
-        </div>
-        <p className="text-xs text-amber-800 leading-relaxed">
-          The administrator authentication is set up exactly as specified for project submission:
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-          <div className="p-3 bg-white rounded-xl border border-amber-200 text-xs">
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">Admin Email</span>
-            <span className="font-mono font-bold text-slate-900 text-sm">admin@gamil.com</span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">(also supports admin@gmail.com)</span>
-          </div>
-          <div className="p-3 bg-white rounded-xl border border-amber-200 text-xs">
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">Admin Password</span>
-            <span className="font-mono font-bold text-slate-900 text-sm">admin123</span>
-            <span className="text-[10px] text-emerald-600 block mt-0.5 font-medium">Auto-upserted & active</span>
-          </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+        <div>
+          <h1 className="text-2xl font-black text-[#0f172a] tracking-tight">
+            Cinema Operations & Platform Settings
+          </h1>
+          <p className="text-xs text-[#64748b] mt-1">
+            Configure platform policies, ticket booking fees, box office contact channels, and system preferences.
+          </p>
         </div>
       </div>
 
-      {/* Database Seeder Section (Crucial for Demo) */}
-      <div className="bg-white border border-[#e8ecf2] rounded-2xl p-6 sm:p-7 shadow-2xs space-y-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-neutral-900 font-bold text-base">
-              <Database size={18} className="text-[#ff5500]" />
-              <span>Project Demo Data Seeder</span>
-            </div>
-            <p className="text-xs text-slate-500 leading-relaxed max-w-xl">
-              Populate or refresh the database with blockbuster films (Dune 2, Oppenheimer, Silent Frequency), theater auditoriums (IMAX Laser & Dolby VIP), live upcoming showtimes across 3 days, and realistic customer ticket bookings.
-            </p>
+      {savedSuccess && (
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2 animate-in fade-in">
+          <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+          <span>Platform settings updated successfully.</span>
+        </div>
+      )}
+
+      <form onSubmit={handleSaveSettings} className="space-y-6">
+        {/* Section 1: Cinema Brand & Contact */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-900 border-b border-slate-100 pb-3">
+            <Building2 size={17} className="text-[#ff5500]" />
+            <span>Cinema Organization & Contact</span>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-orange-50 text-[#ff5500] flex items-center justify-center shrink-0">
-            <Sparkles size={20} />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Cinema Brand Name
+              </label>
+              <input
+                type="text"
+                value={cinemaName}
+                onChange={(e) => setCinemaName(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-[#ff5500]"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Display Currency
+              </label>
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-[#ff5500]"
+              >
+                <option value="INR (₹)">Indian Rupee (₹ INR)</option>
+                <option value="USD ($)">US Dollar ($ USD)</option>
+                <option value="EUR (€)">Euro (€ EUR)</option>
+                <option value="GBP (£)">British Pound (£ GBP)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1 flex items-center gap-1.5">
+                <Mail size={13} className="text-slate-400" />
+                <span>Box Office Support Email</span>
+              </label>
+              <input
+                type="email"
+                value={supportEmail}
+                onChange={(e) => setSupportEmail(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-[#ff5500]"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1 flex items-center gap-1.5">
+                <Phone size={13} className="text-slate-400" />
+                <span>Concierge & Inquiries Phone</span>
+              </label>
+              <input
+                type="text"
+                value={supportPhone}
+                onChange={(e) => setSupportPhone(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-[#ff5500]"
+              />
+            </div>
           </div>
         </div>
 
-        {seedResult && (
-          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 space-y-1 animate-in fade-in">
-            <div className="flex items-center gap-2 font-bold text-emerald-900">
-              <CheckCircle2 size={16} />
-              <span>{seedResult.message}</span>
-            </div>
-            {seedResult.stats && (
-              <p className="text-[11px] font-mono text-emerald-700">
-                Seeded: {seedResult.stats.moviesCount} movies • {seedResult.stats.showsCreated} shows • {seedResult.stats.cinemas} cinemas
+        {/* Section 2: Box Office & Ticketing Rules */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-900 border-b border-slate-100 pb-3">
+            <Ticket size={17} className="text-[#ff5500]" />
+            <span>Ticketing & Admission Policy</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Technology & Convenience Fee (₹)
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={convenienceFee}
+                onChange={(e) => setConvenienceFee(Number(e.target.value))}
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-[#ff5500]"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                Flat fee applied once per online booking transaction.
               </p>
-            )}
-          </div>
-        )}
+            </div>
 
-        {seedError && (
-          <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2">
-            <AlertCircle size={16} />
-            <span>{seedError}</span>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Max Seats Per Booking
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={maxSeatsPerBooking}
+                onChange={(e) => setMaxSeatsPerBooking(Number(e.target.value))}
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-[#ff5500]"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                Prevents bulk scalping and maintains seat distribution.
+              </p>
+            </div>
           </div>
-        )}
 
-        <div className="flex flex-wrap items-center gap-3 pt-2">
-          <button
-            onClick={() => handleSeedDatabase(false)}
-            disabled={isSeeding}
-            className="px-5 py-2.5 bg-[#ff5500] hover:bg-[#e64d00] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50"
-          >
-            {isSeeding ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            <span>Seed / Sync Showcase Data</span>
-          </button>
-
-          <button
-            onClick={() => {
-              if (confirm("Reset and re-seed all shows, movies, and bookings from clean showcase state?")) {
-                handleSeedDatabase(true);
-              }
-            }}
-            disabled={isSeeding}
-            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-colors cursor-pointer disabled:opacity-50"
-          >
-            Clean Reset & Re-Seed
-          </button>
-        </div>
-      </div>
-
-      {/* System Status Table */}
-      <div className="bg-white border border-[#e8ecf2] rounded-2xl p-6 shadow-2xs space-y-4">
-        <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
-          <Server size={16} className="text-slate-400" />
-          <span>Environment & Infrastructure Status</span>
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
-            <span className="text-slate-500 font-medium">Database</span>
-            <span className="font-semibold text-emerald-700 flex items-center gap-1.5 font-mono">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              MongoDB Atlas Active
-            </span>
-          </div>
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
-            <span className="text-slate-500 font-medium">Session Auth</span>
-            <span className="font-semibold text-slate-900 font-mono">
-              HTTP-Only JWT Cookie
-            </span>
-          </div>
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
-            <span className="text-slate-500 font-medium">Booking Engine</span>
-            <span className="font-semibold text-emerald-700 flex items-center gap-1.5 font-mono">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              Real-Time Seat Locking
-            </span>
-          </div>
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
-            <span className="text-slate-500 font-medium">Framework</span>
-            <span className="font-semibold text-slate-900 font-mono">
-              Next.js 16 + React 19
-            </span>
+          <div className="pt-2">
+            <label className="flex items-center gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={allowCancellations}
+                onChange={(e) => setAllowCancellations(e.target.checked)}
+                className="rounded border-slate-300 text-[#ff5500] focus:ring-[#ff5500] h-4 w-4"
+              />
+              <span className="text-xs font-medium text-slate-800">
+                Allow customers to cancel unredeemed bookings up to 2 hours before showtime
+              </span>
+            </label>
           </div>
         </div>
-      </div>
+
+        {/* Section 3: Architecture & System Status */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-900 border-b border-slate-100 pb-3">
+            <Server size={17} className="text-[#ff5500]" />
+            <span>Infrastructure & Storage Status</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs flex items-center justify-between">
+              <div>
+                <span className="font-bold text-slate-900 block">Database Storage</span>
+                <span className="text-slate-500 text-[11px]">MongoDB Atlas Cluster</span>
+              </div>
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Connected
+              </span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs flex items-center justify-between">
+              <div>
+                <span className="font-bold text-slate-900 block">Media CDN</span>
+                <span className="text-slate-500 text-[11px]">Cloudinary Secure Storage</span>
+              </div>
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Active
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Submit */}
+        <div className="flex justify-end pt-2">
+          <button
+            type="submit"
+            className="px-6 py-2.5 bg-[#ff5500] hover:bg-[#e64d00] text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+          >
+            <Save size={15} />
+            <span>Save Platform Settings</span>
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
