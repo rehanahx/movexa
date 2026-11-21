@@ -15,7 +15,6 @@ import {
   Ticket,
   Loader2,
   AlertCircle,
-  Sparkles,
   X,
   Compass,
 } from "lucide-react";
@@ -273,8 +272,7 @@ export default function MovieDetailPage({
           </Link>
           <div className="flex items-center gap-2">
             {movie.isFeatured && (
-              <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-orange-50 text-[#ff5500] font-bold border border-orange-200 uppercase flex items-center gap-1">
-                <Sparkles size={11} />
+              <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-neutral-100 text-neutral-900 font-bold border border-neutral-300 uppercase tracking-wider">
                 Featured
               </span>
             )}

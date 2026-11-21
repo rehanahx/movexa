@@ -13,7 +13,6 @@ import {
   AlertCircle,
   Clapperboard,
   Trash2,
-  Sparkles,
   Edit,
   Eye,
 } from "lucide-react";
@@ -247,7 +246,9 @@ export default function AdminMoviesPage() {
                           <p className="font-bold text-slate-900 text-sm truncate flex items-center gap-1.5">
                             <span>{m.title}</span>
                             {m.isFeatured && (
-                              <Sparkles size={12} className="text-[#ff5500] shrink-0" />
+                              <span className="text-[9px] uppercase font-mono font-bold tracking-wider text-neutral-900 bg-neutral-100 px-1.5 py-0.5 rounded border border-neutral-300 shrink-0">
+                                Featured
+                              </span>
                             )}
                           </p>
                           <p className="text-[11px] text-slate-400 font-mono truncate">{m.slug}</p>
@@ -280,9 +281,9 @@ export default function AdminMoviesPage() {
                         title="Click to toggle featured status"
                       >
                         {togglingFeaturedId === m._id ? (
-                          <Loader2 size={11} className="animate-spin text-[#ff5500]" />
+                          <Loader2 size={11} className="animate-spin text-neutral-900" />
                         ) : (
-                          <Sparkles size={11} className={m.isFeatured ? "text-[#ff5500]" : ""} />
+                          <Star size={11} className={m.isFeatured ? "fill-neutral-900 text-neutral-900" : "text-neutral-400"} />
                         )}
                         <span>{m.isFeatured ? "Featured" : "Standard"}</span>
                       </button>

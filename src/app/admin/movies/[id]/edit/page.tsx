@@ -10,7 +10,7 @@ import {
   CheckCircle2,
   Plus,
   X,
-  Sparkles,
+  Award,
   ExternalLink,
 } from "lucide-react";
 import ImageUploader from "@/components/admin/ImageUploader";
@@ -606,7 +606,7 @@ export default function EditMoviePage({
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <Sparkles size={16} className="text-[#ff5500]" />
+              <Award size={16} className="text-neutral-900" />
               <span>4. Featured Movie Presentation</span>
             </h2>
           </div>

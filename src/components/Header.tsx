@@ -11,9 +11,6 @@ import {
   ChevronDown,
   LogOut,
   Ticket,
-  ShieldAlert,
-  Film,
-  Sparkles,
   LayoutDashboard,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -58,33 +55,32 @@ export default function Header() {
     }
   };
 
-  // Do not render user header inside /admin
+  // Do not render public header inside /admin
   if (pathname?.startsWith("/admin")) {
     return null;
   }
 
   const navLinks = [
-    { label: "Home", href: "/" },
-    { label: "Movies", href: "/#movies" },
-    { label: "Cinemas", href: "/#cinemas" },
-    { label: "My Bookings", href: user ? "/bookings" : "/login?redirect=/bookings" },
+    { label: "Screenings", href: "/#movies" },
+    { label: "Auditoriums", href: "/#cinemas" },
+    { label: "Reservations", href: user ? "/bookings" : "/login?redirect=/bookings" },
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b border-neutral-200 shadow-2xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 h-16 flex items-center justify-between gap-4">
-        {/* Brand Logo */}
-        <Link href="/" className="flex items-center gap-2 shrink-0 group">
-          <div className="w-7 h-7 rounded-lg bg-[#111827] text-white flex items-center justify-center font-black text-sm group-hover:bg-[#ff5500] transition-colors">
+    <header className="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-md border-b border-neutral-200/80 transition-all">
+      <div className="max-w-7xl mx-auto px-6 lg:px-12 h-16 flex items-center justify-between gap-6">
+        {/* Brand Logo - Minimalist Editorial */}
+        <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
+          <div className="w-6 h-6 rounded-sm bg-neutral-950 text-white flex items-center justify-center font-bold text-xs tracking-wider">
             M
           </div>
-          <span className="text-xl font-black tracking-tight text-neutral-950 font-sans uppercase">
+          <span className="text-sm font-extrabold tracking-[0.25em] text-neutral-950 uppercase font-sans">
             MOVEXA
           </span>
         </Link>
 
         {/* Desktop Nav Links */}
-        <nav className="hidden md:flex items-center gap-8 text-xs font-semibold uppercase tracking-wider text-neutral-600">
+        <nav className="hidden md:flex items-center gap-8 text-[11px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
           {navLinks.map((link) => {
             const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
             return (
@@ -92,22 +88,23 @@ export default function Header() {
                 key={link.label}
                 href={link.href}
                 className={`transition-colors py-1 relative ${
-                  isActive ? "text-neutral-950 font-bold" : "text-neutral-600 hover:text-neutral-950"
+                  isActive ? "text-neutral-950 font-bold" : "hover:text-neutral-950"
                 }`}
               >
                 <span>{link.label}</span>
-                {isActive && <span className="absolute bottom-0 left-0 w-full h-[2px] bg-[#ff5500]" />}
+                {isActive && (
+                  <span className="absolute bottom-0 left-0 w-full h-[1.5px] bg-neutral-950" />
+                )}
               </Link>
             );
           })}
 
-          {/* Admin badge if role is admin */}
           {user?.role === "admin" && (
             <Link
               href="/admin"
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-[#fff4ed] text-[#ff5500] border border-[#ffddc7] text-xs font-bold hover:bg-[#ffe8d9] transition-colors"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-neutral-300 text-neutral-800 text-[10px] font-mono uppercase tracking-wider hover:bg-neutral-950 hover:text-white hover:border-neutral-950 transition-colors"
             >
-              <LayoutDashboard size={13} />
+              <LayoutDashboard size={12} />
               <span>Admin Panel</span>
             </Link>
           )}
@@ -115,15 +112,15 @@ export default function Header() {
 
         {/* Right Search & Profile CTA */}
         <div className="flex items-center gap-3">
-          {/* Search Box */}
-          <form onSubmit={handleSearchSubmit} className="hidden sm:flex items-center relative w-52 lg:w-64">
-            <Search size={14} className="absolute left-3 text-neutral-400 pointer-events-none" />
+          {/* Minimalist Search Box */}
+          <form onSubmit={handleSearchSubmit} className="hidden sm:flex items-center relative w-48 lg:w-56">
+            <Search size={13} className="absolute left-3 text-neutral-400 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search movies, genre..."
+              placeholder="Search titles..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-xs bg-neutral-100/90 hover:bg-neutral-100 focus:bg-white text-neutral-900 placeholder:text-neutral-400 border border-transparent focus:border-neutral-300 rounded-full outline-none transition-all"
+              className="w-full pl-8 pr-3 py-1.5 text-xs bg-neutral-50 hover:bg-neutral-100/70 focus:bg-white text-neutral-900 placeholder:text-neutral-400 border border-neutral-200 focus:border-neutral-900 rounded-lg outline-none transition-all font-sans"
             />
           </form>
 
@@ -134,43 +131,40 @@ export default function Header() {
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                className="flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-full border border-neutral-200 hover:border-neutral-300 bg-white hover:bg-neutral-50 transition-colors cursor-pointer"
+                className="flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-lg border border-neutral-200 hover:border-neutral-400 bg-white transition-colors cursor-pointer"
               >
-                <div className="w-6 h-6 rounded-full bg-[#111827] text-white flex items-center justify-center text-[10px] font-bold uppercase">
+                <div className="w-5 h-5 rounded-full bg-neutral-950 text-white flex items-center justify-center text-[10px] font-mono font-bold uppercase">
                   {user.name.charAt(0)}
                 </div>
-                <span className="hidden sm:inline text-xs font-semibold text-neutral-900 max-w-[100px] truncate">
+                <span className="hidden sm:inline text-xs font-medium text-neutral-900 max-w-[100px] truncate">
                   {user.name}
                 </span>
-                <ChevronDown size={14} className="text-neutral-400" />
+                <ChevronDown size={13} className="text-neutral-400" />
               </button>
 
               {/* User Dropdown Menu */}
               {userDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white border border-neutral-200 rounded-xl shadow-xl py-2 z-50 animate-in fade-in-50">
-                  <div className="px-4 py-2 border-b border-neutral-100">
+                <div className="absolute right-0 mt-2 w-52 bg-white border border-neutral-200 rounded-xl shadow-lg py-1.5 z-50 animate-in fade-in-50">
+                  <div className="px-3.5 py-2 border-b border-neutral-100">
                     <p className="text-xs font-bold text-neutral-900 truncate">{user.name}</p>
-                    <p className="text-[11px] text-neutral-500 truncate">{user.email}</p>
-                    <span className="inline-block mt-1 text-[9px] font-mono uppercase px-2 py-0.5 rounded bg-neutral-100 text-neutral-600 font-semibold">
-                      Role: {user.role}
-                    </span>
+                    <p className="text-[11px] text-neutral-400 font-mono truncate">{user.email}</p>
                   </div>
 
                   <div className="py-1">
                     <Link
                       href="/bookings"
-                      className="flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 hover:text-neutral-950 transition-colors"
+                      className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 hover:text-neutral-950 transition-colors"
                     >
-                      <Ticket size={14} className="text-[#ff5500]" />
+                      <Ticket size={13} className="text-neutral-500" />
                       <span>My Bookings</span>
                     </Link>
 
                     {user.role === "admin" && (
                       <Link
                         href="/admin"
-                        className="flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 hover:text-neutral-950 transition-colors"
+                        className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 hover:text-neutral-950 transition-colors"
                       >
-                        <LayoutDashboard size={14} className="text-amber-600" />
+                        <LayoutDashboard size={13} className="text-neutral-500" />
                         <span>Admin Dashboard</span>
                       </Link>
                     )}
@@ -179,9 +173,9 @@ export default function Header() {
                   <div className="border-t border-neutral-100 pt-1">
                     <button
                       onClick={handleLogout}
-                      className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer text-left"
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors text-left cursor-pointer"
                     >
-                      <LogOut size={14} />
+                      <LogOut size={13} />
                       <span>Sign Out</span>
                     </button>
                   </div>
@@ -192,73 +186,63 @@ export default function Header() {
             <div className="flex items-center gap-2">
               <Link
                 href="/login"
-                className="px-3.5 py-1.5 text-xs font-semibold text-neutral-700 hover:text-neutral-950 transition-colors"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-neutral-700 hover:text-neutral-950 hover:bg-neutral-100 transition-colors"
               >
                 Sign In
               </Link>
               <Link
                 href="/register"
-                className="px-4 py-1.5 bg-[#111827] hover:bg-black text-white text-xs font-semibold rounded-lg shadow-xs transition-colors"
+                className="px-3.5 py-1.5 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-white text-xs font-semibold tracking-wide transition-colors"
               >
                 Register
               </Link>
             </div>
           )}
 
-          {/* Mobile Menu Toggle */}
+          {/* Mobile Menu Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 rounded-lg text-neutral-600 hover:bg-neutral-100 transition-colors cursor-pointer"
-            aria-label="Toggle menu"
+            className="md:hidden p-2 rounded-lg text-neutral-700 hover:bg-neutral-100 cursor-pointer"
+            aria-label="Toggle Navigation Menu"
           >
-            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>
       </div>
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-neutral-200 bg-white px-6 py-4 space-y-3">
-          {navLinks.map((link) => (
-            <Link
-              key={link.label}
-              href={link.href}
-              className="block py-2 text-sm font-semibold text-neutral-800 hover:text-[#ff5500] transition-colors"
-            >
-              {link.label}
-            </Link>
-          ))}
-          {user?.role === "admin" && (
-            <Link
-              href="/admin"
-              className="block py-2 text-sm font-bold text-[#ff5500] hover:underline"
-            >
-              Admin Dashboard
-            </Link>
-          )}
-          {user ? (
-            <button
-              onClick={handleLogout}
-              className="w-full text-left py-2 text-sm font-semibold text-rose-600"
-            >
-              Sign Out
-            </button>
-          ) : (
-            <div className="pt-2 flex flex-col gap-2">
+        <div className="md:hidden border-t border-neutral-200 bg-white px-6 py-4 space-y-4 animate-in slide-in-from-top-2">
+          <form onSubmit={handleSearchSubmit} className="relative w-full">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+            <input
+              type="text"
+              placeholder="Search movies..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-xs bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-900"
+            />
+          </form>
+
+          <nav className="flex flex-col space-y-2 text-xs font-semibold uppercase tracking-wider text-neutral-700">
+            {navLinks.map((link) => (
               <Link
-                href="/login"
-                className="w-full text-center py-2 text-xs font-semibold bg-neutral-100 rounded-lg text-neutral-900"
+                key={link.label}
+                href={link.href}
+                className="py-2 hover:text-neutral-950 border-b border-neutral-100"
               >
-                Sign In
+                {link.label}
               </Link>
+            ))}
+            {user?.role === "admin" && (
               <Link
-                href="/register"
-                className="w-full text-center py-2 text-xs font-semibold bg-[#111827] text-white rounded-lg"
+                href="/admin"
+                className="py-2 text-neutral-950 font-bold border-b border-neutral-100"
               >
-                Register
+                Admin Panel
               </Link>
-            </div>
-          )}
+            )}
+          </nav>
         </div>
       )}
     </header>

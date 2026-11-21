@@ -17,15 +17,15 @@ export interface IMovie {
   bannerImage?: {
     url: string;
     publicId?: string;
-  };
+  } | null;
 
   // Toggle whether this movie appears in the primary hero banner carousel
   isFeatured?: boolean;
 
   // Custom banner tagline e.g. "NOW SHOWING IN IMAX 70MM"
-  tagline?: string;
+  tagline?: string | null;
 
-  trailerUrl?: string;
+  trailerUrl?: string | null;
 
   genre: string[];
   language: string;
@@ -33,10 +33,10 @@ export interface IMovie {
 
   releaseDate: Date;
 
-  director?: string;
+  director?: string | null;
   cast: string[];
 
-  rating?: number;
+  rating?: number | null;
   status: MovieStatus;
 
   createdAt: Date;

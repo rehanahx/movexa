@@ -4,7 +4,6 @@ import { requireAdmin } from "@/lib/auth";
 import Movie from "@/models/Movie";
 import Show from "@/models/Show";
 import { ensureShowsForMovie } from "@/lib/cinemas";
-import { seedDatabase } from "@/lib/seedDatabase";
 
 export async function GET(
   request: NextRequest,
@@ -52,25 +51,7 @@ export async function GET(
       }).lean();
     }
 
-    // 5. If movie still not found, check if DB is unseeded (first time on Vercel)
     if (!movie) {
-      const movieCount = await Movie.countDocuments();
-      if (movieCount === 0) {
-        await seedDatabase();
-        // Retry search after seeding
-        const escaped = decodedId.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
-        movie = await Movie.findOne({
-          $or: [
-            { slug: { $regex: new RegExp(`^${escaped}$`, "i") } },
-            { title: { $regex: new RegExp(`^${escaped}$`, "i") } },
-            { slug: { $regex: new RegExp(escaped, "i") } },
-          ],
-        }).lean();
-      }
-    }
-
-    if (!movie) {
-      // Suggest other existing movies so frontend can link to them
       const suggestions = await Movie.find({})
         .select("title slug thumbnail")
         .limit(4)
@@ -99,7 +80,6 @@ export async function GET(
       .sort({ date: 1, startTime: 1 })
       .lean();
 
-    // If no upcoming shows exist, automatically schedule shows for today + next 3 days
     if (shows.length === 0) {
       await ensureShowsForMovie((movie as any)._id);
       shows = await Show.find({
@@ -185,7 +165,7 @@ export async function DELETE(
       );
     }
 
-    // Also clean up any shows for this movie
+    // Clean up any shows for this movie
     await Show.deleteMany({ movie: id });
 
     return NextResponse.json({

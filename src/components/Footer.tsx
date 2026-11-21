@@ -10,80 +10,48 @@ export default function Footer() {
   if (pathname?.startsWith("/admin")) {
     return null;
   }
+
   return (
-    <footer className="w-full bg-white border-t border-neutral-200 text-neutral-600">
-      <div className="max-w-7xl mx-auto px-6 lg:px-12 py-14 lg:py-20">
+    <footer className="w-full bg-[#0a0a0a] text-neutral-400 border-t border-neutral-900 font-sans">
+      <div className="max-w-7xl mx-auto px-6 lg:px-12 py-16 lg:py-20">
         <div className="grid grid-cols-2 md:grid-cols-12 gap-8 lg:gap-12">
           {/* Brand Info */}
-          <div className="col-span-2 md:col-span-4 pr-0 md:pr-8">
-            <Link href="/" className="inline-flex items-center gap-2 mb-3">
-              <span className="w-2.5 h-2.5 bg-black" aria-hidden="true" />
-              <span className="text-base font-bold tracking-[-0.04em] text-black uppercase font-sans">
+          <div className="col-span-2 md:col-span-5 pr-0 md:pr-10 space-y-4">
+            <Link href="/" className="inline-flex items-center gap-2.5">
+              <span className="w-5 h-5 bg-white text-neutral-950 font-bold text-[10px] flex items-center justify-center tracking-wider">
+                M
+              </span>
+              <span className="text-sm font-extrabold tracking-[0.25em] text-white uppercase font-sans">
                 MOVEXA
               </span>
             </Link>
-            <p className="text-xs text-neutral-500 leading-relaxed max-w-sm mb-4">
-              Next-generation cinema ticketing. Reserved luxury recliners, 70mm analog film prints, and 4K laser projection.
+            <p className="text-xs text-neutral-400 leading-relaxed max-w-sm">
+              Curated cinema experiences. Reserved luxury auditorium seating, laser projection, and spatial audio architectures.
             </p>
-            <div className="flex items-center gap-2 text-[11px] text-neutral-400 font-mono">
-              <span className="w-1.5 h-1.5 bg-emerald-500 inline-block" />
-              <span>Box Office Open • Advance Sales Active</span>
-            </div>
+            <p className="text-[11px] font-mono text-neutral-500 uppercase tracking-widest pt-1">
+              Live Box Office • Automated Admission Passes
+            </p>
           </div>
 
-          {/* Films Column */}
-          <div className="col-span-1 md:col-span-2 md:col-start-6">
-            <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-black mb-3">
-              Films
+          {/* Screenings Column */}
+          <div className="col-span-1 md:col-span-2 md:col-start-7">
+            <span className="block text-[11px] font-mono font-semibold uppercase tracking-[0.2em] text-white mb-4">
+              Cinema
             </span>
-            <ul className="space-y-2.5 text-xs text-neutral-600">
+            <ul className="space-y-2.5 text-xs text-neutral-400">
               <li>
-                <Link href="/" className="hover:text-black transition-colors">
+                <Link href="/#movies" className="hover:text-white transition-colors">
                   Now Showing
                 </Link>
               </li>
               <li>
-                <Link href="/" className="hover:text-black transition-colors">
+                <Link href="/#movies" className="hover:text-white transition-colors">
                   Coming Soon
                 </Link>
               </li>
               <li>
-                <Link href="/" className="hover:text-black transition-colors">
-                  IMAX® 70mm
-                </Link>
-              </li>
-              <li>
-                <Link href="/" className="hover:text-black transition-colors">
-                  Dolby Cinema
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Theaters Column */}
-          <div className="col-span-1 md:col-span-2">
-            <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-black mb-3">
-              Cinemas
-            </span>
-            <ul className="space-y-2.5 text-xs text-neutral-600">
-              <li>
-                <Link href="/" className="hover:text-black transition-colors">
-                  Locations
-                </Link>
-              </li>
-              <li>
-                <Link href="/" className="hover:text-black transition-colors">
-                  Auditorium Tech
-                </Link>
-              </li>
-              <li>
-                <Link href="/" className="hover:text-black transition-colors">
-                  Private Screenings
-                </Link>
-              </li>
-              <li>
-                <Link href="/" className="hover:text-black transition-colors">
-                  Accessibility
+                <Link href="/#cinemas" className="hover:text-white transition-colors">
+                  Auditoriums
                 </Link>
               </li>
             </ul>
@@ -91,48 +59,48 @@ export default function Footer() {
 
           {/* Account Column */}
           <div className="col-span-1 md:col-span-2">
-            <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-black mb-3">
-              Account
+            <span className="block text-[11px] font-mono font-semibold uppercase tracking-[0.2em] text-white mb-4">
+              Access
             </span>
-            <ul className="space-y-2.5 text-xs text-neutral-600">
+            <ul className="space-y-2.5 text-xs text-neutral-400">
               <li>
-                <Link href="/login" className="hover:text-black transition-colors">
+                <Link href="/bookings" className="hover:text-white transition-colors">
+                  My Reservations
+                </Link>
+              </li>
+              <li>
+                <Link href="/login" className="hover:text-white transition-colors">
                   Sign In
                 </Link>
               </li>
               <li>
-                <Link href="/register" className="hover:text-black transition-colors">
+                <Link href="/register" className="hover:text-white transition-colors">
                   Create Account
-                </Link>
-              </li>
-              <li>
-                <Link href="/" className="hover:text-black transition-colors">
-                  Booking Support
-                </Link>
-              </li>
-              <li>
-                <Link href="/" className="hover:text-black transition-colors">
-                  Refunds & Exchange
                 </Link>
               </li>
             </ul>
           </div>
+
+          {/* Legal / Policy */}
+          <div className="col-span-2 md:col-span-2">
+            <span className="block text-[11px] font-mono font-semibold uppercase tracking-[0.2em] text-white mb-4">
+              Concierge
+            </span>
+            <p className="text-xs text-neutral-400 leading-relaxed">
+              Downtown Metropolis Center & Westside Promenade.
+            </p>
+            <p className="text-[11px] font-mono text-neutral-500 mt-2">
+              support@movexa.com
+            </p>
+          </div>
         </div>
 
-        {/* Bottom Metadata & Legal */}
-        <div className="mt-14 pt-8 border-t border-neutral-200 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-neutral-400 font-mono">
-          <div>
-            © {new Date().getFullYear()} MOVEXA SYSTEMS INC. ALL RIGHTS RESERVED.
-          </div>
-          <div className="flex items-center gap-6 font-sans text-xs text-neutral-500">
-            <Link href="/" className="hover:text-black transition-colors">
-              Privacy Policy
-            </Link>
-            <span className="text-neutral-300">/</span>
-            <Link href="/" className="hover:text-black transition-colors">
-              Terms of Use
-            </Link>
-          </div>
+        {/* Bottom copyright line */}
+        <div className="pt-12 mt-12 border-t border-neutral-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] font-mono text-neutral-500">
+          <span>© {new Date().getFullYear()} MOVEXA CINEMAS. ALL RIGHTS RESERVED.</span>
+          <span className="uppercase tracking-widest text-[10px]">
+            PRODUCTION SHOWCASE BUILD
+          </span>
         </div>
       </div>
     </footer>
